@@ -13,7 +13,13 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import Logo from '@/components/Logo';
-import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
+import {
+  Colors,
+  Spacing,
+  BorderRadius,
+  Typography,
+  Shadow,
+} from '@/constants/theme';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -103,7 +109,9 @@ export default function LoginScreen() {
             </View>
             <Text style={styles.cardTitle}>Keep your progress safe</Text>
             <Text style={styles.cardSubtitle}>
-              {isSignUp ? 'Create an account to start your journey' : 'Welcome back to your learning journey'}
+              {isSignUp
+                ? 'Create an account to start your journey'
+                : 'Welcome back to your learning journey'}
             </Text>
           </View>
 
@@ -138,7 +146,10 @@ export default function LoginScreen() {
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <TouchableOpacity
-              style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
+              style={[
+                styles.primaryButton,
+                loading && styles.primaryButtonDisabled,
+              ]}
               onPress={handleAuth}
               disabled={loading}
             >
@@ -190,15 +201,15 @@ export default function LoginScreen() {
               disabled={loading}
             >
               <Text style={styles.switchButtonText}>
-                {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                {isSignUp
+                  ? 'Already have an account? Sign In'
+                  : "Don't have an account? Sign Up"}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        <Text style={styles.footer}>
-          Start your parenting journey with Lio
-        </Text>
+        <Text style={styles.footer}>Start your parenting journey with Lio</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

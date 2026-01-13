@@ -3,6 +3,7 @@ import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
+import { supabase } from '@/lib/supabase';
 
 export default function Index() {
   const { session, loading } = useAuth();
@@ -11,6 +12,17 @@ export default function Index() {
 
   useEffect(() => {
     if (loading) return;
+
+    // db testt
+    const checkConnection = async () => {
+      const { data, error } = await supabase.from('units').select('*').limit(1);
+      if (error) {
+        console.log('❌ Supabase Connection Error:', error.message);
+      } else {
+        console.log('✅ Supabase is Connected! Found units:', data);
+      }
+    };
+    checkConnection();
 
     const inAuthGroup = segments[0] === '(auth)';
 
