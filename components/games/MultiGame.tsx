@@ -9,6 +9,8 @@ import SequenceGame from './SequenceGame';
 import SwipeGame from './SwipeGame';
 import BathTimeSwipeGame from './BathTimeSwipeGame';
 import SliderGame from './SliderGame';
+import MassageGame from './MassageGame';
+import MilestoneSwipeGame from './MilestoneSwipeGame';
 
 type Section = {
   type:
@@ -18,7 +20,9 @@ type Section = {
     | 'bucketSort'
     | 'sequence'
     | 'swipe'
-    | 'slider';
+    | 'slider'
+    | 'tracing'
+    | 'milestoneCheck';
   questions?: any[];
   instructions?: string;
   tempo?: number;
@@ -135,6 +139,15 @@ export default function MultiGame({ content, onComplete }: Props) {
               safeRange: currentSection.safeRange || [0, 0],
               unit: currentSection.unit || '',
             }}
+            onComplete={handleSectionComplete}
+          />
+        );
+      case 'tracing':
+        return <MassageGame onComplete={handleSectionComplete} />;
+      case 'milestoneCheck':
+        return (
+          <MilestoneSwipeGame
+            content={{ cards: currentSection.cards || [] }}
             onComplete={handleSectionComplete}
           />
         );
