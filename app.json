@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "bolt-expo-nativewind",
-    "slug": "bolt-expo-nativewind",
+    "name": "Lianebi",
+    "slug": "lianebi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -27,6 +27,12 @@
     },
     "android": {
       "package": "com.lionfromrustavi.boltexponativewind"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "688843b0-9e8c-4611-98b7-6792ab127313"
+      }
     }
   }
 }
