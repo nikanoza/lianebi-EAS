@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -12,7 +13,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import LioMascot from '@/components/LioMascot';
 import { ArrowLeft, Check, Lock } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
+import {
+  Colors,
+  Spacing,
+  BorderRadius,
+  Typography,
+  Shadow,
+} from '@/constants/theme';
 
 type Lesson = {
   id: string;
@@ -36,16 +43,21 @@ export default function UnitMapScreen() {
   const { profile } = useAuth();
   const router = useRouter();
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [userProgress, setUserProgress] = useState<Record<string, UserProgress>>({});
+  const [userProgress, setUserProgress] = useState<
+    Record<string, UserProgress>
+  >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unitTitle, setUnitTitle] = useState('');
 
-  useEffect(() => {
-    if (id) {
-      fetchLessons();
-    }
-  }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      if (id) {
+        // Force a fresh fetch every time the screen is viewed
+        fetchLessons();
+      }
+    }, [id])
+  );
 
   const fetchLessons = async () => {
     try {
@@ -104,10 +116,13 @@ export default function UnitMapScreen() {
         .from('user_progress')
         .select('*')
         .eq('user_id', profile.id)
-        .in('lesson_id', lessonsList.map(l => l.id));
+        .in(
+          'lesson_id',
+          lessonsList.map((l) => l.id)
+        );
 
       const progressMap: Record<string, UserProgress> = {};
-      progressData?.forEach(p => {
+      progressData?.forEach((p) => {
         progressMap[p.lesson_id] = p;
       });
 
@@ -132,7 +147,7 @@ export default function UnitMapScreen() {
   };
 
   const handleLessonPress = (lesson: Lesson) => {
-    const index = lessons.findIndex(l => l.id === lesson.id);
+    const index = lessons.findIndex((l) => l.id === lesson.id);
     const state = getLessonState(lesson, index);
 
     if (state === 'locked') return;
@@ -151,7 +166,10 @@ export default function UnitMapScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{unitTitle}</Text>
@@ -225,17 +243,29 @@ export default function UnitMapScreen() {
 
                   <View style={styles.lessonInfo}>
                     <Text style={styles.dayLabel}>Day {lesson.day_number}</Text>
-                    <Text style={[styles.lessonTitle, isLocked && styles.lessonTitleLocked]}>
+                    <Text
+                      style={[
+                        styles.lessonTitle,
+                        isLocked && styles.lessonTitleLocked,
+                      ]}
+                    >
                       {lesson.title}
                     </Text>
                     {lesson.description && (
-                      <Text style={[styles.lessonDescription, isLocked && styles.lessonDescriptionLocked]}>
+                      <Text
+                        style={[
+                          styles.lessonDescription,
+                          isLocked && styles.lessonDescriptionLocked,
+                        ]}
+                      >
                         {lesson.description}
                       </Text>
                     )}
                     {!isLocked && (
                       <View style={styles.rewardBadge}>
-                        <Text style={styles.rewardText}>+{lesson.care_drops_reward} drops</Text>
+                        <Text style={styles.rewardText}>
+                          +{lesson.care_drops_reward} drops
+                        </Text>
                       </View>
                     )}
                   </View>

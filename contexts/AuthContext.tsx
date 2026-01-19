@@ -19,7 +19,11 @@ type AuthContextType = {
   profile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, displayName?: string) => Promise<{ error: any }>;
+  signUp: (
+    email: string,
+    password: string,
+    displayName?: string
+  ) => Promise<{ error: any }>;
   signInWithGoogle: () => Promise<{ error: any }>;
   signInWithFacebook: () => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -52,7 +56,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('Error fetching profile:', error);
           break;
         }
-
         if (data) {
           setProfile(data);
           break;
@@ -60,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         attempts++;
         if (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
       }
     } catch (error) {
@@ -84,7 +87,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       (async () => {
         setSession(session);
         setUser(session?.user ?? null);
@@ -119,7 +124,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
-  const signUp = async (email: string, password: string, displayName?: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    displayName?: string
+  ) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -132,7 +141,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        redirectTo:
+          typeof window !== 'undefined' ? window.location.origin : undefined,
       },
     });
     return { error };
@@ -142,7 +152,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'facebook',
       options: {
-        redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        redirectTo:
+          typeof window !== 'undefined' ? window.location.origin : undefined,
       },
     });
     return { error };

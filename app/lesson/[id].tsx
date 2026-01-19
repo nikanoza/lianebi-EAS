@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Modal,
+  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,7 +13,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { updateStreak } from '@/lib/streakHelper';
 import { ArrowLeft, Award, Droplet } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
+import {
+  Colors,
+  Spacing,
+  BorderRadius,
+  Typography,
+  Shadow,
+} from '@/constants/theme';
 import SwipeGame from '@/components/games/SwipeGame';
 import RhythmGame from '@/components/games/RhythmGame';
 import DragDropGame from '@/components/games/DragDropGame';
@@ -34,7 +41,7 @@ type Lesson = {
 
 export default function LessonScreen() {
   const { id } = useLocalSearchParams();
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, user } = useAuth();
   const router = useRouter();
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,21 +72,26 @@ export default function LessonScreen() {
   };
 
   const handleComplete = async (finalScore: number) => {
+    await refreshProfile();
     if (!lesson || !profile) return;
 
     setScore(finalScore);
+    // Move setShowResults(true) to AFTER the save or keep here but handle loading state
     setShowResults(true);
-
+    console.log(4);
     try {
-      const { data: existingProgress } = await supabase
+      // 1. Save Progress
+      const { data: existingProgress, error: fetchError } = await supabase
         .from('user_progress')
-        .select('*')
-        .eq('user_id', profile.id)
+        .select('id') // Just select ID to be faster
+        .eq('user_id', user?.id)
         .eq('lesson_id', lesson.id)
         .maybeSingle();
 
+      if (fetchError) throw fetchError;
+      console.log(5);
       if (existingProgress) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('user_progress')
           .update({
             completed: true,
@@ -87,24 +99,24 @@ export default function LessonScreen() {
             completed_at: new Date().toISOString(),
           })
           .eq('id', existingProgress.id);
+        if (updateError) throw updateError;
       } else {
-        await supabase.from('user_progress').insert({
-          user_id: profile.id,
-          lesson_id: lesson.id,
-          completed: true,
-          score: finalScore,
-          completed_at: new Date().toISOString(),
-        });
+        const { error: insertError } = await supabase
+          .from('user_progress')
+          .insert({
+            user_id: profile.id,
+            lesson_id: lesson.id,
+            completed: true,
+            score: finalScore,
+            completed_at: new Date().toISOString(),
+          });
+        if (insertError) throw insertError;
       }
+      console.log(6);
+      // 2. Transaction (Only if needed, wrap in try/catch to avoid blocking progress)
+      // ... (keep your transaction code here)
 
-      await supabase.from('care_drops_transactions').insert({
-        user_id: profile.id,
-        amount: lesson.care_drops_reward,
-        transaction_type: 'lesson_reward',
-        reference_id: lesson.id,
-        description: `Completed: ${lesson.title}`,
-      });
-
+      // 3. Update Profile
       await supabase
         .from('user_profiles')
         .update({
@@ -112,16 +124,32 @@ export default function LessonScreen() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', profile.id);
-
+      console.log(7);
+      // 4. Refresh context
       await updateStreak(profile.id);
       await refreshProfile();
-    } catch (error) {
+      console.log(8);
+    } catch (error: any) {
       console.error('Error saving progress:', error);
+      // SHOW THE ERROR TO THE USER
+      Alert.alert(
+        'Save Error',
+        error.message ||
+          'Could not save progress. Check your internet or RLS policies.'
+      );
     }
   };
 
   const handleContinue = () => {
-    router.back();
+    // Hide modal first
+    setShowResults(false);
+
+    // Fix Navigation: Try to go back, otherwise go to home
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)'); // or wherever your map screen is
+    }
   };
 
   if (loading) {
@@ -139,21 +167,32 @@ export default function LessonScreen() {
       </View>
     );
   }
-
   const renderGame = () => {
     switch (lesson.game_type) {
       case 'swipe':
-        return <SwipeGame content={lesson.content} onComplete={handleComplete} />;
+        return (
+          <SwipeGame content={lesson.content} onComplete={handleComplete} />
+        );
       case 'rhythm':
-        return <RhythmGame content={lesson.content} onComplete={handleComplete} />;
+        return (
+          <RhythmGame content={lesson.content} onComplete={handleComplete} />
+        );
       case 'drag_drop':
-        return <DragDropGame content={lesson.content} onComplete={handleComplete} />;
+        return (
+          <DragDropGame content={lesson.content} onComplete={handleComplete} />
+        );
       case 'slider':
-        return <SliderGame content={lesson.content} onComplete={handleComplete} />;
+        return (
+          <SliderGame content={lesson.content} onComplete={handleComplete} />
+        );
       case 'quiz':
-        return <QuizGame content={lesson.content} onComplete={handleComplete} />;
+        return (
+          <QuizGame content={lesson.content} onComplete={handleComplete} />
+        );
       case 'multi':
-        return <MultiGame content={lesson.content} onComplete={handleComplete} />;
+        return (
+          <MultiGame content={lesson.content} onComplete={handleComplete} />
+        );
       default:
         return (
           <View style={styles.errorContainer}>
@@ -166,7 +205,10 @@ export default function LessonScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
@@ -202,7 +244,10 @@ export default function LessonScreen() {
               </Text>
             </View>
 
-            <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
+            <TouchableOpacity
+              style={styles.continueButton}
+              onPress={handleContinue}
+            >
               <Text style={styles.continueButtonText}>Continue</Text>
             </TouchableOpacity>
           </View>
@@ -324,6 +369,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     marginTop: Spacing.md,
     ...Shadow.medium,
+    zIndex: 9999,
   },
   continueButtonText: {
     fontSize: Typography.sizes.lg,

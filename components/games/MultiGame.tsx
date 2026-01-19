@@ -3,13 +3,17 @@ import { View, StyleSheet } from 'react-native';
 import QuizGame from './QuizGame';
 import RhythmGame from './RhythmGame';
 import { Colors } from '@/constants/theme';
+import DragDropGame from './DragDropGame';
+import BucketSortGame from './BucketSortGame';
 
 type Section = {
-  type: 'quiz' | 'rhythm';
+  type: 'quiz' | 'rhythm' | 'cleanup' | 'bucketSort';
   questions?: any[];
   instructions?: string;
   tempo?: number;
   duration?: number;
+  items?: any[];
+  buckets?: any[];
 };
 
 type Props = {
@@ -61,6 +65,27 @@ export default function MultiGame({ content, onComplete }: Props) {
               instructions: currentSection.instructions || 'Tap to the beat',
               tempo: currentSection.tempo || 80,
               duration: currentSection.duration || 15,
+            }}
+            onComplete={handleSectionComplete}
+          />
+        );
+      case 'cleanup':
+        return (
+          <DragDropGame
+            content={{
+              instructions: currentSection.instructions || '',
+              items: currentSection.items || [],
+            }}
+            onComplete={handleSectionComplete}
+          />
+        );
+      case 'bucketSort':
+        return (
+          <BucketSortGame
+            content={{
+              buckets: currentSection.buckets || [],
+              instructions: currentSection.instructions || '',
+              items: currentSection.items || [],
             }}
             onComplete={handleSectionComplete}
           />

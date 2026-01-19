@@ -7,6 +7,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 
 export default function RootLayout() {
   useFrameworkReady();
+  console.log(2);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

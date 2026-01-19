@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+} from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -10,7 +16,13 @@ import Animated, {
   interpolate,
   Extrapolate,
 } from 'react-native-reanimated';
-import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
+import {
+  Colors,
+  Spacing,
+  BorderRadius,
+  Typography,
+  Shadow,
+} from '@/constants/theme';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import LioMascot from '@/components/LioMascot';
 import { hungerCueIcons } from '@/components/HungerCueIcons';
@@ -48,7 +60,13 @@ type SwipeableCardProps = {
   isActive: boolean;
 };
 
-function SwipeableCard({ card, index, totalCards, onSwipe, isActive }: SwipeableCardProps) {
+function SwipeableCard({
+  card,
+  index,
+  totalCards,
+  onSwipe,
+  isActive,
+}: SwipeableCardProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -127,11 +145,19 @@ function SwipeableCard({ card, index, totalCards, onSwipe, isActive }: Swipeable
     <GestureDetector gesture={gesture}>
       <Animated.View style={[styles.cardWrapper, cardStyle]}>
         <View style={styles.card}>
-          <Animated.View style={[styles.swipeOverlay, styles.leftOverlay, leftOverlayStyle]}>
+          <Animated.View
+            style={[styles.swipeOverlay, styles.leftOverlay, leftOverlayStyle]}
+          >
             <ChevronLeft size={80} color={Colors.white} />
           </Animated.View>
 
-          <Animated.View style={[styles.swipeOverlay, styles.rightOverlay, rightOverlayStyle]}>
+          <Animated.View
+            style={[
+              styles.swipeOverlay,
+              styles.rightOverlay,
+              rightOverlayStyle,
+            ]}
+          >
             <ChevronRight size={80} color={Colors.white} />
           </Animated.View>
 
@@ -150,7 +176,9 @@ function SwipeableCard({ card, index, totalCards, onSwipe, isActive }: Swipeable
                 </Text>
                 {card.illustration.includes(' ') && (
                   <Text style={styles.illustrationText}>
-                    {card.illustration.substring(card.illustration.indexOf(' ') + 1)}
+                    {card.illustration.substring(
+                      card.illustration.indexOf(' ') + 1
+                    )}
                   </Text>
                 )}
               </View>
@@ -163,11 +191,16 @@ function SwipeableCard({ card, index, totalCards, onSwipe, isActive }: Swipeable
 }
 
 export default function SwipeGame({ content, onComplete }: Props) {
-  const [phase, setPhase] = useState<'intro' | 'game' | 'reward'>(content.intro ? 'intro' : 'game');
+  const [phase, setPhase] = useState<'intro' | 'game' | 'reward'>(
+    content.intro ? 'intro' : 'game'
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [lastAnswer, setLastAnswer] = useState<{ correct: boolean; feedback?: string } | null>(null);
+  const [lastAnswer, setLastAnswer] = useState<{
+    correct: boolean;
+    feedback?: string;
+  } | null>(null);
 
   const currentCard = content.cards[currentIndex];
 
@@ -181,7 +214,7 @@ export default function SwipeGame({ content, onComplete }: Props) {
     const isCorrect = direction === currentCard.answer;
 
     if (isCorrect) {
-      setCorrectCount(prev => prev + 1);
+      setCorrectCount((prev) => prev + 1);
     }
 
     setLastAnswer({
@@ -194,14 +227,16 @@ export default function SwipeGame({ content, onComplete }: Props) {
   const handleContinue = () => {
     setShowFeedback(false);
     setLastAnswer(null);
-
+    console.log(1);
     if (currentIndex < content.cards.length - 1) {
-      setCurrentIndex(prev => prev + 1);
+      setCurrentIndex((prev) => prev + 1);
     } else {
       if (content.reward) {
         setPhase('reward');
       } else {
-        const finalScore = Math.round((correctCount / content.cards.length) * 100);
+        const finalScore = Math.round(
+          (correctCount / content.cards.length) * 100
+        );
         onComplete(finalScore);
       }
     }
@@ -218,7 +253,10 @@ export default function SwipeGame({ content, onComplete }: Props) {
         <View style={styles.introContainer}>
           <LioMascot state="excited" size={160} />
           <Text style={styles.introText}>{content.intro.text}</Text>
-          <TouchableOpacity style={styles.startButton} onPress={handleIntroNext}>
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={handleIntroNext}
+          >
             <Text style={styles.startButtonText}>Start Learning</Text>
           </TouchableOpacity>
         </View>
@@ -235,7 +273,10 @@ export default function SwipeGame({ content, onComplete }: Props) {
           {content.reward.reward && (
             <Text style={styles.rewardAmount}>{content.reward.reward}</Text>
           )}
-          <TouchableOpacity style={styles.startButton} onPress={handleRewardNext}>
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={handleRewardNext}
+          >
             <Text style={styles.startButtonText}>Continue</Text>
           </TouchableOpacity>
         </View>
@@ -266,7 +307,12 @@ export default function SwipeGame({ content, onComplete }: Props) {
       {showFeedback && lastAnswer && (
         <Animated.View
           entering={undefined}
-          style={[styles.feedbackOverlay, lastAnswer.correct ? styles.correctOverlay : styles.incorrectOverlay]}
+          style={[
+            styles.feedbackOverlay,
+            lastAnswer.correct
+              ? styles.correctOverlay
+              : styles.incorrectOverlay,
+          ]}
         >
           <Text style={styles.feedbackTitle}>
             {lastAnswer.correct ? 'Correct!' : 'Not quite!'}
@@ -274,7 +320,10 @@ export default function SwipeGame({ content, onComplete }: Props) {
           {lastAnswer.feedback && (
             <Text style={styles.feedbackText}>{lastAnswer.feedback}</Text>
           )}
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
+          <TouchableOpacity
+            style={styles.continueButton}
+            onPress={handleContinue}
+          >
             <Text style={styles.continueButtonText}>
               {currentIndex < content.cards.length - 1 ? 'Next Card' : 'Finish'}
             </Text>
@@ -293,9 +342,7 @@ export default function SwipeGame({ content, onComplete }: Props) {
             <ChevronRight size={20} color={Colors.white} />
           </View>
         </View>
-        <Text style={styles.instructionText}>
-          Swipe the card left or right
-        </Text>
+        <Text style={styles.instructionText}>Swipe the card left or right</Text>
       </View>
     </View>
   );

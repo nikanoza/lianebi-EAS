@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
+import {
+  Colors,
+  Spacing,
+  BorderRadius,
+  Typography,
+  Shadow,
+} from '@/constants/theme';
 import { X } from 'lucide-react-native';
 
 type Item = {
@@ -22,13 +28,14 @@ export default function DragDropGame({ content, onComplete }: Props) {
   const [activeItem, setActiveItem] = useState<string | null>(null);
 
   const handleRemoveItem = (itemId: string) => {
-    setRemovedItems(prev => [...prev, itemId]);
+    setRemovedItems((prev) => [...prev, itemId]);
     setActiveItem(null);
   };
+  console.log(1);
 
   const handleComplete = () => {
-    const unsafeItems = content.items.filter(item => !item.safe);
-    const correctlyRemoved = unsafeItems.filter(item =>
+    const unsafeItems = content.items.filter((item) => !item.safe);
+    const correctlyRemoved = unsafeItems.filter((item) =>
       removedItems.includes(item.id)
     ).length;
 
@@ -37,8 +44,8 @@ export default function DragDropGame({ content, onComplete }: Props) {
   };
 
   const allUnsafeItemsRemoved = content.items
-    .filter(item => !item.safe)
-    .every(item => removedItems.includes(item.id));
+    .filter((item) => !item.safe)
+    .every((item) => removedItems.includes(item.id));
 
   return (
     <View style={styles.container}>
@@ -52,7 +59,7 @@ export default function DragDropGame({ content, onComplete }: Props) {
       <View style={styles.cribContainer}>
         <View style={styles.crib}>
           <View style={styles.cribItems}>
-            {content.items.map(item => {
+            {content.items.map((item) => {
               if (removedItems.includes(item.id)) return null;
 
               return (
@@ -88,8 +95,8 @@ export default function DragDropGame({ content, onComplete }: Props) {
         <View style={styles.removedContainer}>
           <Text style={styles.removedTitle}>Removed Items:</Text>
           <View style={styles.removedItems}>
-            {removedItems.map(itemId => {
-              const item = content.items.find(i => i.id === itemId);
+            {removedItems.map((itemId) => {
+              const item = content.items.find((i) => i.id === itemId);
               return (
                 <View
                   key={itemId}
@@ -108,13 +115,14 @@ export default function DragDropGame({ content, onComplete }: Props) {
 
       <View style={styles.footer}>
         {allUnsafeItemsRemoved ? (
-          <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
+          <TouchableOpacity
+            style={styles.completeButton}
+            onPress={handleComplete}
+          >
             <Text style={styles.completeButtonText}>Complete</Text>
           </TouchableOpacity>
         ) : (
-          <Text style={styles.hint}>
-            Remove all unsafe items to continue
-          </Text>
+          <Text style={styles.hint}>Remove all unsafe items to continue</Text>
         )}
       </View>
     </View>
