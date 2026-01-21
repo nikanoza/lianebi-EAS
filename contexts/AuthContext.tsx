@@ -2,6 +2,17 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import { useRouter, useSegments } from 'expo-router';
+// 1. New Imports for Mobile Auth
+import { makeRedirectUri } from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+
+// 2. Setup the Redirect URI (Must match app.json scheme: "lianebi")
+const redirectTo = makeRedirectUri({
+  scheme: 'lianebi',
+});
+
+// 3. Warm up the browser
+WebBrowser.maybeCompleteAuthSession();
 
 type UserProfile = {
   id: string;
@@ -137,26 +148,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  // --- NEW: Google Sign In for Mobile ---
   const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo:
-          typeof window !== 'undefined' ? window.location.origin : undefined,
-      },
-    });
-    return { error };
+    try {
+      // 1. Get the URL from Supabase
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) return { error };
+
+      // 2. Open the browser
+      const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+      // 3. Handle successful redirect
+      if (res.type === 'success') {
+        const { url } = res;
+        const params = extractParamsFromUrl(url);
+
+        // If no tokens found, return error
+        if (!params.access_token || !params.refresh_token) {
+          return { error: 'No session tokens found' };
+        }
+
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: params.access_token,
+          refresh_token: params.refresh_token,
+        });
+
+        return { error: sessionError };
+      }
+
+      return { error: null }; // User cancelled or closed browser
+    } catch (e) {
+      return { error: e };
+    }
   };
 
+  // --- NEW: Facebook Sign In for Mobile ---
   const signInWithFacebook = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'facebook',
-      options: {
-        redirectTo:
-          typeof window !== 'undefined' ? window.location.origin : undefined,
-      },
-    });
-    return { error };
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+      if (error) return { error };
+
+      const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+      if (res.type === 'success') {
+        const { url } = res;
+        const params = extractParamsFromUrl(url);
+
+        if (!params.access_token || !params.refresh_token) {
+          return { error: 'No session tokens found' };
+        }
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: params.access_token,
+          refresh_token: params.refresh_token,
+        });
+
+        return { error: sessionError };
+      }
+
+      return { error: null };
+    } catch (e) {
+      return { error: e };
+    }
   };
 
   const signOut = async () => {
@@ -186,6 +251,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
+// --- Helper Function (Outside Component) ---
+const extractParamsFromUrl = (url: string) => {
+  const params: { [key: string]: string } = {};
+  const parser = url.split('#')[1] || url.split('?')[1];
+
+  if (parser) {
+    parser.split('&').forEach((part) => {
+      const [key, value] = part.split('=');
+      params[key] = decodeURIComponent(value);
+    });
+  }
+
+  return {
+    access_token: params.access_token,
+    refresh_token: params.refresh_token,
+  };
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
