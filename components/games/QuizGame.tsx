@@ -13,12 +13,11 @@ import {
   Typography,
   Shadow,
 } from '@/constants/theme';
-import { Check, X, ArrowRight, Droplet } from 'lucide-react-native'; // <--- Imported Droplet
+import { Check, X, ArrowRight, Droplet } from 'lucide-react-native';
 import LioMascot from '@/components/LioMascot';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
-// 1. Types that allow BOTH string (old data) and Translation Objects (new data)
 type Translation = { en: string; ka: string };
 type BilingualText = string | Translation;
 
@@ -44,7 +43,12 @@ type Props = {
 
 export default function QuizGame({ content, onComplete }: Props) {
   const { t } = useLanguage();
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
+
+  // FIX: If there is no intro, start at 0 (Question 1). If there is intro, start at -1.
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(
+    content.intro ? -1 : 0,
+  );
+
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(
     null,
   );
@@ -53,7 +57,6 @@ export default function QuizGame({ content, onComplete }: Props) {
 
   const questions = content.questions || [];
 
-  // Helper: Safely extract text whether it's a String or an Object
   const getText = (data: BilingualText | undefined) => {
     if (!data) return '';
     if (typeof data === 'string') return data;
@@ -62,8 +65,12 @@ export default function QuizGame({ content, onComplete }: Props) {
 
   const showingIntro = currentQuestionIndex === -1;
   const showingReward = currentQuestionIndex >= questions.length;
+
+  // Logic update: Ensure we don't try to access questions[-1]
   const currentQuestion =
-    !showingIntro && !showingReward ? questions[currentQuestionIndex] : null;
+    !showingIntro && !showingReward && questions.length > 0
+      ? questions[currentQuestionIndex]
+      : null;
 
   const handleStartQuiz = () => setCurrentQuestionIndex(0);
 
@@ -103,11 +110,9 @@ export default function QuizGame({ content, onComplete }: Props) {
           </Text>
           <Text style={styles.rewardText}>{getText(content.reward.text)}</Text>
 
-          {/* UPDATED REWARD BADGE */}
           <View style={styles.rewardBadge}>
             <Droplet size={24} color={Colors.white} />
             <Text style={styles.rewardBadgeText}>
-              {/* Display "+15" from DB + "Drops" label */}
               {content.reward.reward || '+15'} {t({ en: 'Drops', ka: 'წვეთი' })}
             </Text>
           </View>
@@ -119,6 +124,29 @@ export default function QuizGame({ content, onComplete }: Props) {
           <TouchableOpacity style={styles.finishButton} onPress={handleFinish}>
             <Text style={styles.finishButtonText}>
               {t({ en: 'Continue Journey', ka: 'გზის გაგრძელება' })}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // --- SPECIAL CASE: NO REWARD ---
+  // If MultiGame is using this, it might not pass a reward object.
+  // We should just finish immediately when questions are done.
+  if (showingReward && !content.reward) {
+    // We can render a minimal "Section Complete" or auto-finish.
+    // Ideally MultiGame handles the transition, but let's provide a manual button just in case.
+    return (
+      <View style={styles.container}>
+        <View style={styles.rewardContainer}>
+          <LioMascot state="happy" size={150} />
+          <Text style={styles.rewardTitle}>
+            {t({ en: 'Section Complete!', ka: 'ნაწილი დასრულდა!' })}
+          </Text>
+          <TouchableOpacity style={styles.finishButton} onPress={handleFinish}>
+            <Text style={styles.finishButtonText}>
+              {t({ en: 'Next', ka: 'შემდეგი' })}
             </Text>
           </TouchableOpacity>
         </View>
@@ -458,8 +486,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     lineHeight: 26,
   },
-
-  // UPDATED BADGE STYLES
   rewardBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -476,7 +502,6 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.bold,
     color: Colors.white,
   },
-
   scoreText: {
     fontSize: Typography.sizes.base,
     color: Colors.gray[600],
