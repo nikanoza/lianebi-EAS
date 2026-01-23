@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  Image,
 } from 'react-native';
 import Animated, {
   LinearTransition,
@@ -13,7 +12,7 @@ import Animated, {
   FadeOut,
   ZoomIn,
 } from 'react-native-reanimated';
-import { Check, X, ArrowUp, Undo2 } from 'lucide-react-native';
+import { Check, X, ArrowUp } from 'lucide-react-native';
 import {
   Colors,
   Spacing,
@@ -21,34 +20,50 @@ import {
   Typography,
   Shadow,
 } from '@/constants/theme';
+// 1. IMPORT LANGUAGE HOOK
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
+// 2. DEFINE TYPES
+type BilingualText = string | { en: string; ka: string };
+
 type Item = {
   id: string;
-  text: string;
-  image?: string; // If you have local images
+  text: BilingualText;
+  image?: string;
   correctIndex: number;
 };
 
 type Props = {
   content: {
-    instructions: string;
+    instructions: BilingualText;
     items: Item[];
   };
   onComplete: (score: number) => void;
 };
 
 export default function SequenceGame({ content, onComplete }: Props) {
-  // State for the "Pool" (bottom) and "Slots" (top)
-  // We shuffle the pool initially
+  const { t } = useLanguage();
+
+  // Helper to safely extract text
+  const getText = (text: BilingualText | undefined) => {
+    if (!text) return '';
+    return typeof text === 'object' ? t(text) : text;
+  };
+
+  // State
   const [pool, setPool] = useState<Item[]>([]);
-  const [slots, setSlots] = useState<(Item | null)[]>([null, null, null, null]);
+  const [slots, setSlots] = useState<(Item | null)[]>([]);
   const [isChecked, setIsChecked] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Initialize randomized pool
+  // Initialize randomized pool & slots
   useEffect(() => {
+    // Create empty slots based on the number of items
+    setSlots(new Array(content.items.length).fill(null));
+
+    // Shuffle items for the pool
     const shuffled = [...content.items].sort(() => Math.random() - 0.5);
     setPool(shuffled);
   }, []);
@@ -87,7 +102,7 @@ export default function SequenceGame({ content, onComplete }: Props) {
   // Check the answer
   const handleCheck = () => {
     const isCorrect = slots.every(
-      (item, index) => item?.correctIndex === index
+      (item, index) => item?.correctIndex === index,
     );
     setIsChecked(true);
 
@@ -105,12 +120,14 @@ export default function SequenceGame({ content, onComplete }: Props) {
     }
   };
 
-  const allSlotsFilled = slots.every((s) => s !== null);
+  const allSlotsFilled = slots.length > 0 && slots.every((s) => s !== null);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.instructionText}>{content.instructions}</Text>
+        <Text style={styles.instructionText}>
+          {getText(content.instructions)}
+        </Text>
       </View>
 
       {/* --- SLOTS AREA (Top) --- */}
@@ -118,7 +135,9 @@ export default function SequenceGame({ content, onComplete }: Props) {
         {slots.map((item, index) => (
           <View key={`slot-${index}`} style={styles.slotWrapper}>
             {/* Slot Label (Step 1, 2...) */}
-            <Text style={styles.slotLabel}>Step {index + 1}</Text>
+            <Text style={styles.slotLabel}>
+              {t({ en: 'Step', ka: 'ნაბიჯი' })} {index + 1}
+            </Text>
 
             <TouchableOpacity
               activeOpacity={0.8}
@@ -140,7 +159,7 @@ export default function SequenceGame({ content, onComplete }: Props) {
                   exiting={FadeOut}
                   style={styles.card}
                 >
-                  <Text style={styles.cardText}>{item.text}</Text>
+                  <Text style={styles.cardText}>{getText(item.text)}</Text>
                   {isChecked && (
                     <View style={styles.iconBadge}>
                       {item.correctIndex === index ? (
@@ -154,7 +173,9 @@ export default function SequenceGame({ content, onComplete }: Props) {
               ) : (
                 <View style={styles.emptySlotPlaceholder}>
                   <View style={styles.dashedBorder} />
-                  <Text style={styles.emptyText}>Tap to fill</Text>
+                  <Text style={styles.emptyText}>
+                    {t({ en: 'Tap to fill', ka: 'შეავსეთ' })}
+                  </Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -167,7 +188,9 @@ export default function SequenceGame({ content, onComplete }: Props) {
         {allSlotsFilled && !isChecked && (
           <Animated.View entering={FadeInDown}>
             <TouchableOpacity style={styles.checkButton} onPress={handleCheck}>
-              <Text style={styles.checkButtonText}>Check Order</Text>
+              <Text style={styles.checkButtonText}>
+                {t({ en: 'Check Order', ka: 'შემოწმება' })}
+              </Text>
               <ArrowUp size={20} color="white" />
             </TouchableOpacity>
           </Animated.View>
@@ -175,13 +198,20 @@ export default function SequenceGame({ content, onComplete }: Props) {
 
         {isChecked && !isSuccess && (
           <Animated.View entering={FadeInDown}>
-            <Text style={styles.errorText}>Incorrect sequence. Try again!</Text>
+            <Text style={styles.errorText}>
+              {t({
+                en: 'Incorrect sequence. Try again!',
+                ka: 'არასწორია. სცადეთ თავიდან!',
+              })}
+            </Text>
           </Animated.View>
         )}
 
         {isChecked && isSuccess && (
           <Animated.View entering={FadeInDown}>
-            <Text style={styles.successText}>Perfect Sequence!</Text>
+            <Text style={styles.successText}>
+              {t({ en: 'Perfect Sequence!', ka: 'სწორი თანმიმდევრობაა!' })}
+            </Text>
           </Animated.View>
         )}
       </View>
@@ -189,9 +219,16 @@ export default function SequenceGame({ content, onComplete }: Props) {
       {/* --- POOL AREA (Bottom) --- */}
       <View style={styles.poolContainer}>
         {pool.length > 0 ? (
-          <Text style={styles.poolLabel}>Tap items to place them:</Text>
+          <Text style={styles.poolLabel}>
+            {t({
+              en: 'Tap items to place them:',
+              ka: 'დააჭირეთ დასამატებლად:',
+            })}
+          </Text>
         ) : (
-          <Text style={styles.poolLabel}>All items placed</Text>
+          <Text style={styles.poolLabel}>
+            {t({ en: 'All items placed', ka: 'ყველა ნივთი განთავსებულია' })}
+          </Text>
         )}
 
         <View style={styles.poolGrid}>
@@ -206,7 +243,7 @@ export default function SequenceGame({ content, onComplete }: Props) {
                 style={styles.poolCard}
                 onPress={() => handlePoolTap(item)}
               >
-                <Text style={styles.poolCardText}>{item.text}</Text>
+                <Text style={styles.poolCardText}>{getText(item.text)}</Text>
                 <ArrowUp
                   size={16}
                   color={Colors.primary}
@@ -263,12 +300,12 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   slotCorrect: {
-    backgroundColor: Colors.success + '20', // transparent green
+    backgroundColor: Colors.success + '20',
     borderColor: Colors.success,
     borderWidth: 1,
   },
   slotWrong: {
-    backgroundColor: Colors.error + '20', // transparent red
+    backgroundColor: Colors.error + '20',
     borderColor: Colors.error,
     borderWidth: 1,
   },
@@ -312,7 +349,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: Colors.gray[400], // overridden by container style mostly, just logic dependent
+    backgroundColor: Colors.gray[400],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -355,7 +392,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     padding: Spacing.md,
-    ...Shadow.medium, // subtle top shadow
+    ...Shadow.medium,
   },
   poolLabel: {
     fontSize: Typography.sizes.xs,

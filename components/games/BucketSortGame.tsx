@@ -25,25 +25,30 @@ import {
   Typography,
   Shadow,
 } from '@/constants/theme';
+// 1. IMPORT LANGUAGE HOOK
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 const DROP_ZONE_HEIGHT = 180;
 
+// 2. DEFINE TYPES
+type BilingualText = string | { en: string; ka: string };
+
 type Bucket = {
   id: string;
-  label: string;
+  label: BilingualText;
   icon: string;
 };
 
 type Item = {
-  text: string;
+  text: BilingualText;
   colorHex: string;
   targetBucket: string;
 };
 
 type Props = {
   content: {
-    instructions: string;
+    instructions: BilingualText;
     buckets: Bucket[];
     items: Item[];
   };
@@ -51,9 +56,16 @@ type Props = {
 };
 
 export default function BucketSortGame({ content, onComplete }: Props) {
+  const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [isGameFinished, setIsGameFinished] = useState(false);
+
+  // Helper to safely extract text
+  const getText = (text: BilingualText | undefined) => {
+    if (!text) return '';
+    return typeof text === 'object' ? t(text) : text;
+  };
 
   // Feedback state
   const [feedback, setFeedback] = useState<{
@@ -76,7 +88,10 @@ export default function BucketSortGame({ content, onComplete }: Props) {
     if (isCorrect) {
       // 1. Show Success Feedback
       setScore((prev) => prev + 1);
-      setFeedback({ msg: 'Correct!', type: 'success' });
+      setFeedback({
+        msg: t({ en: 'Correct!', ka: 'სწორია!' }),
+        type: 'success',
+      });
 
       // 2. Wait 1.5 seconds so user notices it
       setTimeout(() => {
@@ -94,7 +109,10 @@ export default function BucketSortGame({ content, onComplete }: Props) {
       }, 1500);
     } else {
       // 1. Show Error Feedback
-      setFeedback({ msg: 'Oops! Wrong zone.', type: 'error' });
+      setFeedback({
+        msg: t({ en: 'Oops! Wrong zone.', ka: 'შეცდომაა! არასწორი ზონა.' }),
+        type: 'error',
+      });
 
       // 2. Wait 1.5 seconds, then reset
       setTimeout(() => {
@@ -146,7 +164,7 @@ export default function BucketSortGame({ content, onComplete }: Props) {
       translationX.value,
       [-width / 2, width / 2],
       [-15, 15],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
 
     return {
@@ -178,9 +196,12 @@ export default function BucketSortGame({ content, onComplete }: Props) {
     <GestureHandlerRootView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.instructionText}>{content.instructions}</Text>
+        <Text style={styles.instructionText}>
+          {getText(content.instructions)}
+        </Text>
         <Text style={styles.progressText}>
-          Item {currentIndex + 1} of {content.items.length}
+          {t({ en: 'Item', ka: 'ნივთი' })} {currentIndex + 1} /{' '}
+          {content.items.length}
         </Text>
       </View>
 
@@ -201,20 +222,20 @@ export default function BucketSortGame({ content, onComplete }: Props) {
                   styles.cardText,
                   {
                     color: ['#000000', '#4B5320', '#D62828'].includes(
-                      currentItem.colorHex
+                      currentItem.colorHex,
                     )
                       ? '#FFF'
                       : '#333',
                   },
                 ]}
               >
-                {currentItem.text}
+                {getText(currentItem.text)}
               </Text>
             </View>
           </Animated.View>
         </GestureDetector>
 
-        {/* --- NEW: Big Central Feedback Overlay --- */}
+        {/* --- Big Central Feedback Overlay --- */}
         {feedback && (
           <Animated.View
             entering={FadeIn.duration(200)}
@@ -258,10 +279,10 @@ export default function BucketSortGame({ content, onComplete }: Props) {
                 {renderIcon(
                   bucket.icon,
                   isLeft ? Colors.success : Colors.error,
-                  32
+                  32,
                 )}
               </View>
-              <Text style={styles.bucketLabel}>{bucket.label}</Text>
+              <Text style={styles.bucketLabel}>{getText(bucket.label)}</Text>
             </View>
           );
         })}
@@ -298,11 +319,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
-    position: 'relative', // Needed for absolute overlay
+    position: 'relative',
   },
+
+  // --- FIXED CARD SIZE ---
   card: {
-    width: width * 0.65,
-    height: width * 0.65,
+    width: 220, // Fixed width (not window percentage)
+    height: 220, // Fixed height
     borderRadius: BorderRadius.xl,
     justifyContent: 'center',
     alignItems: 'center',
@@ -320,7 +343,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // --- Updated Feedback Styles ---
+  // --- Feedback Styles ---
   feedbackOverlay: {
     position: 'absolute',
     top: 0,
@@ -329,9 +352,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)', // Semi-transparent background
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
     zIndex: 100,
-    backdropFilter: 'blur(10px)', // Works on iOS/Web (optional visual candy)
   },
   feedbackCircle: {
     width: 120,
@@ -394,5 +416,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
     color: Colors.gray[700],
+    textAlign: 'center',
   },
 });

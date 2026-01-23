@@ -1,5 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+} from 'react-native';
 import {
   Colors,
   Spacing,
@@ -7,123 +13,207 @@ import {
   Typography,
   Shadow,
 } from '@/constants/theme';
-import { X } from 'lucide-react-native';
+import { useLanguage } from '@/contexts/LanguageContext';
+import {
+  Smile,
+  Cat,
+  Square,
+  Layers,
+  Maximize,
+  FileText,
+  X,
+  Check,
+} from 'lucide-react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSequence,
+  withTiming,
+  FadeIn,
+  ZoomOut,
+} from 'react-native-reanimated';
+
+const { width } = Dimensions.get('window');
+
+// 1. TYPES
+type BilingualText = string | { en: string; ka: string };
 
 type Item = {
   id: string;
-  name: string;
+  name: BilingualText;
   safe: boolean;
+  icon: string;
 };
 
 type Props = {
   content: {
-    instructions: string;
+    instructions: BilingualText;
     items: Item[];
   };
   onComplete: (score: number) => void;
 };
 
+// 2. ICON MAPPER (Smaller size for mobile)
+const getIcon = (name: string, color: string) => {
+  const size = 28; // Reduced from 32 to 28 for mobile
+  switch (name) {
+    case 'smile':
+      return <Smile size={size} color={color} />;
+    case 'cat':
+      return <Cat size={size} color={color} />;
+    case 'square':
+      return <Square size={size} color={color} />;
+    case 'layers':
+      return <Layers size={size} color={color} />;
+    case 'maximize':
+      return <Maximize size={size} color={color} />;
+    case 'file-text':
+      return <FileText size={size} color={color} />;
+    default:
+      return <Square size={size} color={color} />;
+  }
+};
+
+// 3. SINGLE ITEM COMPONENT
+const CribItem = ({ item, onPress, getText }: any) => {
+  const offset = useSharedValue(0);
+
+  const handlePress = () => {
+    if (item.safe) {
+      // Shake animation for safe items
+      offset.value = withSequence(
+        withTiming(-5, { duration: 50 }),
+        withTiming(5, { duration: 50 }),
+        withTiming(-5, { duration: 50 }),
+        withTiming(5, { duration: 50 }),
+        withTiming(0, { duration: 50 }),
+      );
+    }
+    onPress(item);
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: offset.value }],
+  }));
+
+  return (
+    <Animated.View
+      entering={FadeIn}
+      exiting={ZoomOut}
+      style={styles.itemWrapper}
+    >
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={handlePress}
+        style={[styles.item, item.safe ? styles.itemSafe : styles.itemUnsafe]}
+      >
+        <Animated.View style={animatedStyle}>
+          {getIcon(item.icon, item.safe ? Colors.primary : '#D62828')}
+        </Animated.View>
+        <Text style={styles.itemText} numberOfLines={2}>
+          {getText(item.name)}
+        </Text>
+        {!item.safe && (
+          <View style={styles.removeIcon}>
+            <X size={10} color={Colors.white} />
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// 4. MAIN GAME
 export default function DragDropGame({ content, onComplete }: Props) {
-  const [removedItems, setRemovedItems] = useState<string[]>([]);
-  const [activeItem, setActiveItem] = useState<string | null>(null);
+  const { t } = useLanguage();
+  const [activeItems, setActiveItems] = useState<Item[]>(content.items);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
 
-  const handleRemoveItem = (itemId: string) => {
-    setRemovedItems((prev) => [...prev, itemId]);
-    setActiveItem(null);
-  };
-  console.log(1);
-
-  const handleComplete = () => {
-    const unsafeItems = content.items.filter((item) => !item.safe);
-    const correctlyRemoved = unsafeItems.filter((item) =>
-      removedItems.includes(item.id)
-    ).length;
-
-    const score = Math.round((correctlyRemoved / unsafeItems.length) * 100);
-    onComplete(score);
+  const getText = (text: BilingualText | undefined) => {
+    if (!text) return '';
+    return typeof text === 'object' ? t(text) : text;
   };
 
-  const allUnsafeItemsRemoved = content.items
-    .filter((item) => !item.safe)
-    .every((item) => removedItems.includes(item.id));
+  const handleRemoveItem = (item: Item) => {
+    if (item.safe) {
+      setFeedback(
+        t({ en: "Keep this! It's safe.", ka: 'დატოვეთ! ეს უსაფრთხოა.' }),
+      );
+      setTimeout(() => setFeedback(null), 1500);
+    } else {
+      setFeedback(null);
+      setActiveItems((prev) => prev.filter((i) => i.id !== item.id));
+    }
+  };
+
+  useEffect(() => {
+    const unsafeRemaining = activeItems.filter((i) => !i.safe).length;
+    if (unsafeRemaining === 0 && !isComplete) {
+      setIsComplete(true);
+      setTimeout(() => {
+        onComplete(100);
+      }, 1500);
+    }
+  }, [activeItems]);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.instructions}>{content.instructions}</Text>
-        <Text style={styles.subInstructions}>
-          Tap items to remove them from the crib
-        </Text>
+        <Text style={styles.instructions}>{getText(content.instructions)}</Text>
+
+        {feedback ? (
+          <Text
+            style={[
+              styles.subInstructions,
+              { color: Colors.error, fontWeight: 'bold' },
+            ]}
+          >
+            {feedback}
+          </Text>
+        ) : (
+          <Text style={styles.subInstructions}>
+            {t({
+              en: 'Tap unsafe items to remove',
+              ka: 'შეეხეთ სახიფათო ნივთებს',
+            })}
+          </Text>
+        )}
       </View>
 
       <View style={styles.cribContainer}>
+        {/* Crib Box */}
         <View style={styles.crib}>
-          <View style={styles.cribItems}>
-            {content.items.map((item) => {
-              if (removedItems.includes(item.id)) return null;
+          <View style={styles.mattress}>
+            {activeItems.map((item) => (
+              <CribItem
+                key={item.id}
+                item={item}
+                onPress={handleRemoveItem}
+                getText={getText}
+              />
+            ))}
 
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.item}
-                  onPress={() => handleRemoveItem(item.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.itemText}>{item.name}</Text>
-                  <View style={styles.removeIcon}>
-                    <X size={16} color={Colors.error} />
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-
-            {removedItems.length === 0 && (
-              <Text style={styles.cribLabel}>Baby's Crib</Text>
-            )}
-
-            {allUnsafeItemsRemoved && (
-              <View style={styles.safeCrib}>
-                <Text style={styles.safeCribEmoji}>✅</Text>
-                <Text style={styles.safeCribText}>Safe Sleep Environment!</Text>
-              </View>
+            {isComplete && (
+              <Animated.View entering={FadeIn} style={styles.safeMessage}>
+                <Check size={40} color={Colors.success} />
+                <Text style={styles.safeText}>
+                  {t({ en: 'Safe Sleep Zone!', ka: 'უსაფრთხო ზონა!' })}
+                </Text>
+              </Animated.View>
             )}
           </View>
         </View>
+        <Text style={styles.cribLabel}>
+          {t({ en: "Baby's Crib", ka: 'ჩვილის საწოლი' })}
+        </Text>
       </View>
 
-      {removedItems.length > 0 && (
-        <View style={styles.removedContainer}>
-          <Text style={styles.removedTitle}>Removed Items:</Text>
-          <View style={styles.removedItems}>
-            {removedItems.map((itemId) => {
-              const item = content.items.find((i) => i.id === itemId);
-              return (
-                <View
-                  key={itemId}
-                  style={[
-                    styles.removedItem,
-                    item?.safe === false && styles.removedItemCorrect,
-                  ]}
-                >
-                  <Text style={styles.removedItemText}>{item?.name}</Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-      )}
-
       <View style={styles.footer}>
-        {allUnsafeItemsRemoved ? (
-          <TouchableOpacity
-            style={styles.completeButton}
-            onPress={handleComplete}
-          >
-            <Text style={styles.completeButtonText}>Complete</Text>
-          </TouchableOpacity>
-        ) : (
-          <Text style={styles.hint}>Remove all unsafe items to continue</Text>
-        )}
+        <Text style={styles.hint}>
+          {t({ en: 'Unsafe items left: ', ka: 'დარჩენილი საფრთხეები: ' })}
+          {activeItems.filter((i) => !i.safe).length}
+        </Text>
       </View>
     </View>
   );
@@ -133,15 +223,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    padding: Spacing.lg,
+    padding: Spacing.md,
   },
   header: {
     alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+    minHeight: 60,
   },
   instructions: {
-    fontSize: Typography.sizes.xl,
+    fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
     color: Colors.gray[800],
     textAlign: 'center',
@@ -155,113 +246,98 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
   },
+  // --- RESPONSIVE CRIB SIZE ---
   crib: {
     width: '100%',
-    minHeight: 300,
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 4,
-    borderColor: Colors.primary,
-    padding: Spacing.lg,
+    maxWidth: 340, // Fits nicely on mobile
+    aspectRatio: 1,
+    backgroundColor: '#F7F7F7',
+    borderRadius: BorderRadius.xl,
+    borderWidth: 6,
+    borderColor: '#D4A373',
+    padding: Spacing.sm,
     ...Shadow.medium,
   },
-  cribItems: {
+  mattress: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    borderRadius: BorderRadius.lg,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 250,
+    padding: 4,
+    overflow: 'hidden',
   },
   cribLabel: {
-    fontSize: Typography.sizes.lg,
-    color: Colors.gray[400],
+    marginTop: Spacing.sm,
+    fontSize: Typography.sizes.xl,
+    fontWeight: 'bold',
+    color: '#D4A373',
   },
+  itemWrapper: {
+    margin: 4,
+  },
+  // --- RESPONSIVE ITEM SIZE ---
   item: {
-    backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    width: 72,
+    height: 72,
     borderRadius: BorderRadius.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    ...Shadow.small,
-  },
-  itemText: {
-    fontSize: Typography.sizes.base,
-    fontWeight: Typography.weights.medium,
-    color: Colors.white,
-  },
-  removeIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 2,
+    padding: 2,
+    ...Shadow.small,
   },
-  safeCrib: {
-    alignItems: 'center',
-    gap: Spacing.md,
+  itemSafe: {
+    backgroundColor: '#E8F5E9',
+    borderWidth: 1,
+    borderColor: Colors.success,
   },
-  safeCribEmoji: {
-    fontSize: 64,
+  itemUnsafe: {
+    backgroundColor: '#FFEBEE',
+    borderWidth: 1,
+    borderColor: Colors.error,
   },
-  safeCribText: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-    color: Colors.success,
-  },
-  removedContainer: {
-    marginTop: Spacing.lg,
-    padding: Spacing.md,
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.md,
-  },
-  removedTitle: {
-    fontSize: Typography.sizes.base,
-    fontWeight: Typography.weights.semibold,
+  itemText: {
+    fontSize: 9,
+    fontWeight: 'bold',
     color: Colors.gray[700],
-    marginBottom: Spacing.sm,
+    textAlign: 'center',
+    lineHeight: 11,
   },
-  removedItems: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  removeIcon: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: Colors.error,
+    borderRadius: 8,
+    padding: 2,
+  },
+  safeMessage: {
+    position: 'absolute',
+    alignItems: 'center',
     gap: Spacing.xs,
-  },
-  removedItem: {
-    backgroundColor: Colors.gray[200],
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  removedItemCorrect: {
-    backgroundColor: Colors.success + '30',
-  },
-  removedItemText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.gray[700],
-  },
-  footer: {
-    marginTop: Spacing.lg,
-    alignItems: 'center',
-  },
-  completeButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.xxl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.full,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    zIndex: 10,
     ...Shadow.medium,
   },
-  completeButtonText: {
+  safeText: {
     fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-    color: Colors.white,
+    fontWeight: 'bold',
+    color: Colors.success,
+  },
+  footer: {
+    marginTop: Spacing.md,
+    alignItems: 'center',
   },
   hint: {
     fontSize: Typography.sizes.sm,
     color: Colors.gray[600],
-    textAlign: 'center',
+    fontWeight: 'medium',
   },
 });
