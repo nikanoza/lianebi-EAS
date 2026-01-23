@@ -11,6 +11,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+// 1. IMPORT THE LANGUAGE HOOK
+import { useLanguage } from '@/contexts/LanguageContext';
 import LioMascot from '@/components/LioMascot';
 import { ArrowLeft, Check, Lock } from 'lucide-react-native';
 import {
@@ -21,12 +23,18 @@ import {
   Shadow,
 } from '@/constants/theme';
 
+// 2. DEFINE TYPES FOR BILINGUAL DATA
+type LocalizedString = {
+  en: string;
+  ka: string;
+};
+
 type Lesson = {
   id: string;
   unit_id: string;
   day_number: number;
-  title: string;
-  description: string | null;
+  title: LocalizedString; // Changed from string to Object
+  description: LocalizedString | null;
   game_type: string;
   care_drops_reward: number;
   order_index: number;
@@ -42,67 +50,62 @@ export default function UnitMapScreen() {
   const { id } = useLocalSearchParams();
   const { profile } = useAuth();
   const router = useRouter();
+
+  // 3. GET THE TRANSLATION HELPER
+  const { t } = useLanguage();
+
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [userProgress, setUserProgress] = useState<
     Record<string, UserProgress>
   >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [unitTitle, setUnitTitle] = useState('');
+  const [unitTitle, setUnitTitle] = useState<LocalizedString | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       if (id) {
-        // Force a fresh fetch every time the screen is viewed
         fetchLessons();
       }
-    }, [id])
+    }, [id]),
   );
 
   const fetchLessons = async () => {
     try {
       setError(null);
+      // Fetch Unit Info
       const { data: unit, error: unitError } = await supabase
         .from('units')
         .select('title')
         .eq('id', id as string)
         .maybeSingle();
 
-      if (unitError) {
-        console.error('Error fetching unit:', unitError);
-        setError('Failed to load unit: ' + unitError.message);
-        throw unitError;
-      }
+      if (unitError) throw unitError;
+      if (unit) setUnitTitle(unit.title);
 
-      if (unit) {
-        setUnitTitle(unit.title);
-      }
-
+      // Fetch Lessons
       const { data: lessonsData, error: lessonsError } = await supabase
         .from('lessons')
         .select('*')
         .eq('unit_id', id as string)
-        .order('order_index');
+        .order('day_number', { ascending: true });
 
-      if (lessonsError) {
-        console.error('Error fetching lessons:', lessonsError);
-        setError('Failed to load lessons: ' + lessonsError.message);
-        throw lessonsError;
-      }
+      if (lessonsError) throw lessonsError;
 
       if (lessonsData) {
-        console.log('Fetched lessons:', lessonsData.length, lessonsData);
         setLessons(lessonsData);
-        if (profile) {
-          await fetchProgress(lessonsData);
-        }
+        if (profile) await fetchProgress(lessonsData);
       } else {
-        console.log('No lessons data returned');
         setLessons([]);
       }
     } catch (error: any) {
       console.error('Error fetching lessons:', error);
-      setError('Failed to load lessons. Please try again.');
+      setError(
+        t({
+          en: 'Failed to load lessons',
+          ka: 'ვერ მოხერხდა გაკვეთილების ჩატვირთვა',
+        }),
+      );
     } finally {
       setLoading(false);
     }
@@ -110,7 +113,6 @@ export default function UnitMapScreen() {
 
   const fetchProgress = async (lessonsList: Lesson[]) => {
     if (!profile) return;
-
     try {
       const { data: progressData } = await supabase
         .from('user_progress')
@@ -118,14 +120,13 @@ export default function UnitMapScreen() {
         .eq('user_id', profile.id)
         .in(
           'lesson_id',
-          lessonsList.map((l) => l.id)
+          lessonsList.map((l) => l.id),
         );
 
       const progressMap: Record<string, UserProgress> = {};
       progressData?.forEach((p) => {
         progressMap[p.lesson_id] = p;
       });
-
       setUserProgress(progressMap);
     } catch (error) {
       console.error('Error fetching progress:', error);
@@ -139,19 +140,18 @@ export default function UnitMapScreen() {
     const prevLesson = index > 0 ? lessons[index - 1] : null;
     const prevProgress = prevLesson ? userProgress[prevLesson.id] : null;
 
-    if (index === 0 || prevProgress?.completed) {
-      return 'active';
-    }
-
+    if (index === 0 || prevProgress?.completed) return 'active';
     return 'locked';
   };
 
   const handleLessonPress = (lesson: Lesson) => {
-    const index = lessons.findIndex((l) => l.id === lesson.id);
-    const state = getLessonState(lesson, index);
-
+    const state = getLessonState(
+      lesson,
+      lessons.findIndex((l) => l.id === lesson.id),
+    );
     if (state === 'locked') return;
 
+    // Make sure we pass the ID to the player
     router.push(`/lesson/${lesson.id}`);
   };
 
@@ -162,7 +162,6 @@ export default function UnitMapScreen() {
       </View>
     );
   }
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -172,7 +171,10 @@ export default function UnitMapScreen() {
         >
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{unitTitle}</Text>
+
+        {/* 4. TRANSLATE UNIT TITLE */}
+        <Text style={styles.headerTitle}>{t(unitTitle)}</Text>
+
         <View style={styles.placeholder} />
       </View>
 
@@ -185,16 +187,25 @@ export default function UnitMapScreen() {
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={fetchLessons}>
-              <Text style={styles.retryButtonText}>Retry</Text>
+              <Text style={styles.retryButtonText}>
+                {t({ en: 'Retry', ka: 'თავიდან ცდა' })}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
 
         {!error && !loading && lessons.length === 0 && (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No lessons available yet</Text>
+            <Text style={styles.emptyText}>
+              {t({
+                en: 'No lessons available yet',
+                ka: 'გაკვეთილები ჯერ არ არის',
+              })}
+            </Text>
             <TouchableOpacity style={styles.retryButton} onPress={fetchLessons}>
-              <Text style={styles.retryButtonText}>Reload</Text>
+              <Text style={styles.retryButtonText}>
+                {t({ en: 'Reload', ka: 'განახლება' })}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -205,8 +216,8 @@ export default function UnitMapScreen() {
             const isCompleted = state === 'completed';
             const isActive = state === 'active';
             const isLocked = state === 'locked';
-
             const isLeft = index % 2 === 0;
+            console.log(lesson);
 
             return (
               <View
@@ -242,15 +253,25 @@ export default function UnitMapScreen() {
                   </View>
 
                   <View style={styles.lessonInfo}>
-                    <Text style={styles.dayLabel}>Day {lesson.day_number}</Text>
+                    {/* 5. TRANSLATE "DAY X" */}
+                    <Text style={styles.dayLabel}>
+                      {t({
+                        en: `Day ${lesson.day_number}`,
+                        ka: `დღე ${lesson.day_number}`,
+                      })}
+                    </Text>
+
+                    {/* 6. TRANSLATE LESSON TITLE */}
                     <Text
                       style={[
                         styles.lessonTitle,
                         isLocked && styles.lessonTitleLocked,
                       ]}
                     >
-                      {lesson.title}
+                      {t(lesson.title)}
                     </Text>
+
+                    {/* 7. TRANSLATE DESCRIPTION */}
                     {lesson.description && (
                       <Text
                         style={[
@@ -258,13 +279,15 @@ export default function UnitMapScreen() {
                           isLocked && styles.lessonDescriptionLocked,
                         ]}
                       >
-                        {lesson.description}
+                        {t(lesson.description)}
                       </Text>
                     )}
+
                     {!isLocked && (
                       <View style={styles.rewardBadge}>
                         <Text style={styles.rewardText}>
-                          +{lesson.care_drops_reward} drops
+                          +{lesson.care_drops_reward}{' '}
+                          {t({ en: 'drops', ka: 'წვეთი' })}
                         </Text>
                       </View>
                     )}
@@ -280,10 +303,8 @@ export default function UnitMapScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  // Your styles remain exactly the same
+  container: { flex: 1, backgroundColor: Colors.background },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -309,29 +330,16 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
     color: Colors.white,
-  },
-  placeholder: {
-    width: 40,
-  },
-  scrollView: {
+    textAlign: 'center',
     flex: 1,
   },
-  scrollContent: {
-    padding: Spacing.lg,
-  },
-  mapContainer: {
-    paddingVertical: Spacing.lg,
-  },
-  lessonNodeContainer: {
-    position: 'relative',
-    marginBottom: Spacing.xl,
-  },
-  lessonNodeLeft: {
-    alignItems: 'flex-start',
-  },
-  lessonNodeRight: {
-    alignItems: 'flex-end',
-  },
+  placeholder: { width: 40 },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: Spacing.lg },
+  mapContainer: { paddingVertical: Spacing.lg },
+  lessonNodeContainer: { position: 'relative', marginBottom: Spacing.xl },
+  lessonNodeLeft: { alignItems: 'flex-start' },
+  lessonNodeRight: { alignItems: 'flex-end' },
   pathLine: {
     position: 'absolute',
     top: -Spacing.xl,
@@ -352,17 +360,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  lessonNodeCompleted: {
-    borderColor: Colors.gold,
-    backgroundColor: '#FFFEF5',
-  },
-  lessonNodeActive: {
-    borderColor: Colors.primary,
-    ...Shadow.large,
-  },
-  lessonNodeLocked: {
-    opacity: 0.6,
-  },
+  lessonNodeCompleted: { borderColor: Colors.gold, backgroundColor: '#FFFEF5' },
+  lessonNodeActive: { borderColor: Colors.primary, ...Shadow.large },
+  lessonNodeLocked: { opacity: 0.6 },
   lessonIconContainer: {
     width: 60,
     height: 60,
@@ -377,10 +377,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  lessonInfo: {
-    flex: 1,
-    gap: Spacing.xs,
-  },
+  lessonInfo: { flex: 1, gap: Spacing.xs },
   dayLabel: {
     fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.semibold,
@@ -392,17 +389,13 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.bold,
     color: Colors.gray[800],
   },
-  lessonTitleLocked: {
-    color: Colors.gray[500],
-  },
+  lessonTitleLocked: { color: Colors.gray[500] },
   lessonDescription: {
     fontSize: Typography.sizes.sm,
     color: Colors.gray[600],
     lineHeight: 18,
   },
-  lessonDescriptionLocked: {
-    color: Colors.gray[400],
-  },
+  lessonDescriptionLocked: { color: Colors.gray[400] },
   rewardBadge: {
     alignSelf: 'flex-start',
     backgroundColor: Colors.accent,
@@ -440,10 +433,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.base,
     fontWeight: Typography.weights.semibold,
   },
-  emptyContainer: {
-    padding: Spacing.xxl,
-    alignItems: 'center',
-  },
+  emptyContainer: { padding: Spacing.xxl, alignItems: 'center' },
   emptyText: {
     fontSize: Typography.sizes.lg,
     color: Colors.gray[500],

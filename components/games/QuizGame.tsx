@@ -1,122 +1,158 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
-import { Check, X } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
+import {
+  Colors,
+  Spacing,
+  BorderRadius,
+  Typography,
+  Shadow,
+} from '@/constants/theme';
+import { Check, X, ArrowRight, Droplet } from 'lucide-react-native'; // <--- Imported Droplet
 import LioMascot from '@/components/LioMascot';
+import { useLanguage } from '@/contexts/LanguageContext';
+import Animated, { FadeIn } from 'react-native-reanimated';
+
+// 1. Types that allow BOTH string (old data) and Translation Objects (new data)
+type Translation = { en: string; ka: string };
+type BilingualText = string | Translation;
+
+type QuestionOption = {
+  text: BilingualText;
+  isCorrect: boolean;
+};
 
 type Question = {
-  question: string;
-  options: string[];
-  correctAnswer: string;
-  feedback?: string;
+  question: BilingualText;
+  options: QuestionOption[];
+  feedback?: BilingualText;
 };
 
 type Props = {
   content: {
-    intro?: {
-      text: string;
-    };
+    intro?: { text: BilingualText };
     questions: Question[];
-    reward?: {
-      text: string;
-      reward: string;
-    };
+    reward?: { text: BilingualText; reward: string };
   };
   onComplete: (score: number) => void;
 };
 
 export default function QuizGame({ content, onComplete }: Props) {
+  const { t } = useLanguage();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(
+    null,
+  );
   const [showFeedback, setShowFeedback] = useState(false);
   const [score, setScore] = useState(0);
-  const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
-  const [showReward, setShowReward] = useState(false);
 
-  const showingIntro = currentQuestionIndex === -1;
-  const showingQuestion = currentQuestionIndex >= 0 && currentQuestionIndex < content.questions.length;
-  const currentQuestion = showingQuestion ? content.questions[currentQuestionIndex] : null;
+  const questions = content.questions || [];
 
-  const handleStartQuiz = () => {
-    setCurrentQuestionIndex(0);
+  // Helper: Safely extract text whether it's a String or an Object
+  const getText = (data: BilingualText | undefined) => {
+    if (!data) return '';
+    if (typeof data === 'string') return data;
+    return t(data);
   };
 
-  const handleAnswerSelect = (answer: string) => {
+  const showingIntro = currentQuestionIndex === -1;
+  const showingReward = currentQuestionIndex >= questions.length;
+  const currentQuestion =
+    !showingIntro && !showingReward ? questions[currentQuestionIndex] : null;
+
+  const handleStartQuiz = () => setCurrentQuestionIndex(0);
+
+  const handleAnswerSelect = (index: number) => {
     if (showFeedback) return;
+    setSelectedOptionIndex(index);
+  };
 
-    setSelectedAnswer(answer);
+  const handleSubmitAnswer = () => {
+    if (selectedOptionIndex === null || !currentQuestion) return;
+    const isCorrect = currentQuestion.options[selectedOptionIndex].isCorrect;
+    if (isCorrect) setScore(score + 1);
     setShowFeedback(true);
-
-    const isCorrect = answer === currentQuestion?.correctAnswer;
-    if (isCorrect) {
-      setScore(score + 1);
-    }
-
-    setAnsweredQuestions(new Set([...answeredQuestions, currentQuestionIndex]));
   };
 
   const handleNextQuestion = () => {
-    setSelectedAnswer(null);
     setShowFeedback(false);
-
-    if (currentQuestionIndex < content.questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      if (content.reward) {
-        setShowReward(true);
-      } else {
-        const finalScore = Math.round((score / content.questions.length) * 100);
-        onComplete(finalScore);
-      }
-    }
+    setSelectedOptionIndex(null);
+    setCurrentQuestionIndex((prev) => prev + 1);
   };
 
   const handleFinish = () => {
-    const finalScore = Math.round((score / content.questions.length) * 100);
+    const finalScore = Math.round((score / questions.length) * 100);
     onComplete(finalScore);
   };
 
-  if (showReward && content.reward) {
+  // --- REWARD SCREEN ---
+  if (showingReward && content.reward) {
     return (
       <View style={styles.container}>
         <View style={styles.rewardContainer}>
           <View style={styles.mascotContainer}>
             <LioMascot state="happy" size={150} />
           </View>
-          <Text style={styles.rewardTitle}>Fantastic!</Text>
-          <Text style={styles.rewardText}>{content.reward.text}</Text>
+          <Text style={styles.rewardTitle}>
+            {t({ en: 'Fantastic!', ka: 'ფანტასტიკურია!' })}
+          </Text>
+          <Text style={styles.rewardText}>{getText(content.reward.text)}</Text>
+
+          {/* UPDATED REWARD BADGE */}
           <View style={styles.rewardBadge}>
-            <Text style={styles.rewardBadgeText}>{content.reward.reward}</Text>
+            <Droplet size={24} color={Colors.white} />
+            <Text style={styles.rewardBadgeText}>
+              {/* Display "+15" from DB + "Drops" label */}
+              {content.reward.reward || '+15'} {t({ en: 'Drops', ka: 'წვეთი' })}
+            </Text>
           </View>
+
           <Text style={styles.scoreText}>
-            You got {score} out of {content.questions.length} correct!
+            {t({ en: 'You got', ka: 'თქვენ გამოიცანით' })} {score} /{' '}
+            {questions.length}
           </Text>
           <TouchableOpacity style={styles.finishButton} onPress={handleFinish}>
-            <Text style={styles.finishButtonText}>Continue Journey</Text>
+            <Text style={styles.finishButtonText}>
+              {t({ en: 'Continue Journey', ka: 'გზის გაგრძელება' })}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
+  // --- INTRO SCREEN ---
   if (showingIntro && content.intro) {
     return (
       <View style={styles.container}>
         <View style={styles.introContainer}>
           <View style={styles.mascotContainer}>
-            <LioMascot state="standing" size={150} />
+            <LioMascot state="excited" size={150} />
           </View>
-          <Text style={styles.introText}>{content.intro.text}</Text>
-          <TouchableOpacity style={styles.startButton} onPress={handleStartQuiz}>
-            <Text style={styles.startButtonText}>Start Quiz</Text>
+          <Text style={styles.introText}>{getText(content.intro.text)}</Text>
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={handleStartQuiz}
+          >
+            <Text style={styles.startButtonText}>
+              {t({ en: 'Start Quiz', ka: 'ტესტის დაწყება' })}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  if (showingQuestion && currentQuestion) {
-    const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+  // --- QUIZ SCREEN ---
+  if (currentQuestion) {
+    const isCorrect =
+      selectedOptionIndex !== null &&
+      currentQuestion.options[selectedOptionIndex].isCorrect;
 
     return (
       <View style={styles.container}>
@@ -125,12 +161,15 @@ export default function QuizGame({ content, onComplete }: Props) {
             <View
               style={[
                 styles.progressFill,
-                { width: `${((currentQuestionIndex + 1) / content.questions.length) * 100}%` }
+                {
+                  width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`,
+                },
               ]}
             />
           </View>
           <Text style={styles.progressText}>
-            Question {currentQuestionIndex + 1} of {content.questions.length}
+            {t({ en: 'Question', ka: 'კითხვა' })} {currentQuestionIndex + 1} /{' '}
+            {questions.length}
           </Text>
         </View>
 
@@ -140,44 +179,54 @@ export default function QuizGame({ content, onComplete }: Props) {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.questionContainer}>
-            <Text style={styles.questionText}>{currentQuestion.question}</Text>
+            <Text style={styles.questionText}>
+              {getText(currentQuestion.question)}
+            </Text>
 
             <View style={styles.optionsContainer}>
               {currentQuestion.options.map((option, index) => {
-                const isSelected = selectedAnswer === option;
-                const isCorrectOption = option === currentQuestion.correctAnswer;
-                const showCorrect = showFeedback && isCorrectOption;
-                const showIncorrect = showFeedback && isSelected && !isCorrect;
+                const isSelected = selectedOptionIndex === index;
+                const isCorrectOption = option.isCorrect;
+
+                let borderStyle = {};
+                let bgStyle = {};
+                let textStyle = {};
+
+                if (showFeedback) {
+                  if (isCorrectOption) {
+                    borderStyle = { borderColor: Colors.success };
+                    bgStyle = { backgroundColor: Colors.success + '10' };
+                    textStyle = { color: Colors.success, fontWeight: 'bold' };
+                  } else if (isSelected && !isCorrectOption) {
+                    borderStyle = { borderColor: Colors.error };
+                    bgStyle = { backgroundColor: Colors.error + '10' };
+                    textStyle = { color: Colors.error };
+                  }
+                } else if (isSelected) {
+                  borderStyle = { borderColor: Colors.primary };
+                  bgStyle = { backgroundColor: Colors.primary + '10' };
+                  textStyle = { color: Colors.primary, fontWeight: 'bold' };
+                }
 
                 return (
                   <TouchableOpacity
                     key={index}
-                    style={[
-                      styles.optionButton,
-                      isSelected && !showFeedback && styles.optionButtonSelected,
-                      showCorrect && styles.optionButtonCorrect,
-                      showIncorrect && styles.optionButtonIncorrect,
-                    ]}
-                    onPress={() => handleAnswerSelect(option)}
+                    style={[styles.optionButton, borderStyle, bgStyle]}
+                    onPress={() => handleAnswerSelect(index)}
                     disabled={showFeedback}
                   >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        isSelected && !showFeedback && styles.optionTextSelected,
-                        (showCorrect || showIncorrect) && styles.optionTextFeedback,
-                      ]}
-                    >
-                      {option}
+                    <Text style={[styles.optionText, textStyle]}>
+                      {getText(option.text)}
                     </Text>
-                    {showCorrect && (
+
+                    {showFeedback && isCorrectOption && (
                       <View style={styles.iconContainer}>
-                        <Check size={24} color={Colors.white} />
+                        <Check size={24} color={Colors.success} />
                       </View>
                     )}
-                    {showIncorrect && (
+                    {showFeedback && isSelected && !isCorrectOption && (
                       <View style={styles.iconContainer}>
-                        <X size={24} color={Colors.white} />
+                        <X size={24} color={Colors.error} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -185,18 +234,71 @@ export default function QuizGame({ content, onComplete }: Props) {
               })}
             </View>
 
-            {showFeedback && currentQuestion.feedback && (
-              <View style={[styles.feedbackContainer, isCorrect ? styles.feedbackCorrect : styles.feedbackIncorrect]}>
-                <Text style={styles.feedbackText}>{currentQuestion.feedback}</Text>
-              </View>
+            {!showFeedback && (
+              <TouchableOpacity
+                style={[
+                  styles.checkButton,
+                  selectedOptionIndex === null && styles.disabledButton,
+                ]}
+                onPress={handleSubmitAnswer}
+                disabled={selectedOptionIndex === null}
+              >
+                <Text style={styles.checkButtonText}>
+                  {t({ en: 'Check Answer', ka: 'შემოწმება' })}
+                </Text>
+              </TouchableOpacity>
             )}
 
             {showFeedback && (
-              <TouchableOpacity style={styles.nextButton} onPress={handleNextQuestion}>
-                <Text style={styles.nextButtonText}>
-                  {currentQuestionIndex < content.questions.length - 1 ? 'Next Question' : 'See Results'}
-                </Text>
-              </TouchableOpacity>
+              <Animated.View entering={FadeIn} style={styles.feedbackArea}>
+                <View
+                  style={[
+                    styles.feedbackContainer,
+                    isCorrect
+                      ? styles.feedbackCorrect
+                      : styles.feedbackIncorrect,
+                  ]}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                      marginBottom: 5,
+                    }}
+                  >
+                    <LioMascot
+                      state={isCorrect ? 'happy' : 'standing'}
+                      size={40}
+                    />
+                    <Text
+                      style={[
+                        styles.feedbackTitle,
+                        { color: isCorrect ? Colors.success : Colors.error },
+                      ]}
+                    >
+                      {isCorrect
+                        ? t({ en: 'Correct!', ka: 'სწორია!' })
+                        : t({ en: 'Not quite...', ka: 'არასწორია...' })}
+                    </Text>
+                  </View>
+                  <Text style={styles.feedbackText}>
+                    {getText(currentQuestion.feedback)}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.nextButton}
+                  onPress={handleNextQuestion}
+                >
+                  <Text style={styles.nextButtonText}>
+                    {currentQuestionIndex < questions.length - 1
+                      ? t({ en: 'Next Question', ka: 'შემდეგი კითხვა' })
+                      : t({ en: 'See Results', ka: 'შედეგები' })}
+                  </Text>
+                  <ArrowRight size={20} color={Colors.white} />
+                </TouchableOpacity>
+              </Animated.View>
             )}
           </View>
         </ScrollView>
@@ -208,10 +310,7 @@ export default function QuizGame({ content, onComplete }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
   progressContainer: {
     padding: Spacing.lg,
     backgroundColor: Colors.white,
@@ -235,21 +334,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: Typography.weights.medium,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: Spacing.lg,
-  },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: Spacing.lg, paddingBottom: 40 },
   introContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.xl,
   },
-  mascotContainer: {
-    marginBottom: Spacing.xl,
-  },
+  mascotContainer: { marginBottom: Spacing.xl },
   introText: {
     fontSize: Typography.sizes.xl,
     color: Colors.gray[800],
@@ -269,9 +362,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
   },
-  questionContainer: {
-    gap: Spacing.lg,
-  },
+  questionContainer: { gap: Spacing.lg },
   questionText: {
     fontSize: Typography.sizes.xxl,
     fontWeight: Typography.weights.bold,
@@ -279,9 +370,7 @@ const styles = StyleSheet.create({
     lineHeight: 32,
     marginBottom: Spacing.md,
   },
-  optionsContainer: {
-    gap: Spacing.md,
-  },
+  optionsContainer: { gap: Spacing.md },
   optionButton: {
     backgroundColor: Colors.white,
     padding: Spacing.lg,
@@ -293,50 +382,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...Shadow.small,
   },
-  optionButtonSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.gray[50],
-  },
-  optionButtonCorrect: {
-    borderColor: Colors.success,
-    backgroundColor: Colors.success,
-  },
-  optionButtonIncorrect: {
-    borderColor: Colors.error,
-    backgroundColor: Colors.error,
-  },
   optionText: {
     fontSize: Typography.sizes.base,
     color: Colors.gray[800],
     flex: 1,
     lineHeight: 22,
   },
-  optionTextSelected: {
-    color: Colors.primary,
-    fontWeight: Typography.weights.semibold,
+  iconContainer: { marginLeft: Spacing.sm },
+  checkButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    ...Shadow.small,
   },
-  optionTextFeedback: {
+  disabledButton: { backgroundColor: Colors.gray[300], opacity: 0.7 },
+  checkButtonText: {
     color: Colors.white,
-    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
   },
-  iconContainer: {
-    marginLeft: Spacing.sm,
-  },
+  feedbackArea: { marginTop: Spacing.sm, gap: Spacing.lg },
   feedbackContainer: {
     padding: Spacing.lg,
     borderRadius: BorderRadius.md,
-    marginTop: Spacing.sm,
+    borderWidth: 1,
   },
   feedbackCorrect: {
-    backgroundColor: Colors.success + '20',
-    borderWidth: 1,
+    backgroundColor: Colors.success + '10',
     borderColor: Colors.success,
   },
   feedbackIncorrect: {
-    backgroundColor: Colors.error + '20',
-    borderWidth: 1,
+    backgroundColor: Colors.error + '10',
     borderColor: Colors.error,
   },
+  feedbackTitle: { fontSize: Typography.sizes.lg, fontWeight: 'bold' },
   feedbackText: {
     fontSize: Typography.sizes.base,
     color: Colors.gray[800],
@@ -348,7 +429,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     borderRadius: BorderRadius.lg,
     alignItems: 'center',
-    marginTop: Spacing.md,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: Spacing.sm,
     ...Shadow.medium,
   },
   nextButtonText: {
@@ -375,7 +458,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     lineHeight: 26,
   },
+
+  // UPDATED BADGE STYLES
   rewardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     backgroundColor: Colors.accent,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
@@ -388,6 +476,7 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.bold,
     color: Colors.white,
   },
+
   scoreText: {
     fontSize: Typography.sizes.base,
     color: Colors.gray[600],

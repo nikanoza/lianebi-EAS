@@ -11,7 +11,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  withTiming,
   runOnJS,
   interpolate,
   Extrapolate,
@@ -26,18 +25,23 @@ import {
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import LioMascot from '@/components/LioMascot';
 import { hungerCueIcons } from '@/components/HungerCueIcons';
+// 1. IMPORT THE LANGUAGE HOOK
+import { useLanguage } from '@/contexts/LanguageContext';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.lg * 2;
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
+
+// 2. UPDATE TYPES TO SUPPORT BILINGUAL TEXT
+type BilingualText = string | { en: string; ka: string };
 
 type Card = {
   type?: 'intro' | 'swipe' | 'reward';
   image?: string;
   icon?: keyof typeof hungerCueIcons;
-  text: string;
+  text: BilingualText; // Changed from string to BilingualText
   answer?: string;
-  feedback?: string;
+  feedback?: BilingualText; // Changed from string to BilingualText
   illustration?: string;
   lioMessage?: string;
   reward?: string;
@@ -45,9 +49,9 @@ type Card = {
 
 type Props = {
   content: {
-    intro?: Card;
+    intro?: { text: BilingualText };
     cards: Card[];
-    reward?: Card;
+    reward?: { text: BilingualText; reward: string };
   };
   onComplete: (score: number) => void;
 };
@@ -60,13 +64,11 @@ type SwipeableCardProps = {
   isActive: boolean;
 };
 
-function SwipeableCard({
-  card,
-  index,
-  totalCards,
-  onSwipe,
-  isActive,
-}: SwipeableCardProps) {
+// 3. UPDATE SWIPEABLE CARD COMPONENT
+function SwipeableCard({ card, onSwipe, isActive }: SwipeableCardProps) {
+  // Use the hook inside the component
+  const { t } = useLanguage();
+  console.log(card);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -82,12 +84,10 @@ function SwipeableCard({
       const shouldSwipeRight = event.translationX > SWIPE_THRESHOLD;
 
       if (shouldSwipeLeft) {
-        translateX.value = withSpring(-SCREEN_WIDTH * 1.5, { damping: 20 });
-        translateY.value = withSpring(100, { damping: 20 });
+        translateX.value = withSpring(-SCREEN_WIDTH * 1.5);
         runOnJS(onSwipe)('left');
       } else if (shouldSwipeRight) {
-        translateX.value = withSpring(SCREEN_WIDTH * 1.5, { damping: 20 });
-        translateY.value = withSpring(100, { damping: 20 });
+        translateX.value = withSpring(SCREEN_WIDTH * 1.5);
         runOnJS(onSwipe)('right');
       } else {
         translateX.value = withSpring(0);
@@ -100,14 +100,7 @@ function SwipeableCard({
       translateX.value,
       [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
       [-15, 0, 15],
-      Extrapolate.CLAMP
-    );
-
-    const opacity = interpolate(
-      Math.abs(translateX.value),
-      [0, SWIPE_THRESHOLD],
-      [1, 0.8],
-      Extrapolate.CLAMP
+      Extrapolate.CLAMP,
     );
 
     return {
@@ -117,29 +110,32 @@ function SwipeableCard({
         { rotate: `${rotate}deg` },
         { scale: scale.value },
       ],
-      opacity,
     };
   });
 
-  const leftOverlayStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
+  const leftOverlayStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
       translateX.value,
       [-SWIPE_THRESHOLD, 0],
       [1, 0],
-      Extrapolate.CLAMP
-    );
-    return { opacity };
-  });
+      Extrapolate.CLAMP,
+    ),
+  }));
 
-  const rightOverlayStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
+  const rightOverlayStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
       translateX.value,
       [0, SWIPE_THRESHOLD],
       [0, 1],
-      Extrapolate.CLAMP
-    );
-    return { opacity };
-  });
+      Extrapolate.CLAMP,
+    ),
+  }));
+
+  // Helper to safely render text
+  const getText = (text: BilingualText | undefined) => {
+    if (!text) return '';
+    return typeof text === 'object' ? t(text) : text;
+  };
 
   return (
     <GestureDetector gesture={gesture}>
@@ -150,7 +146,6 @@ function SwipeableCard({
           >
             <ChevronLeft size={80} color={Colors.white} />
           </Animated.View>
-
           <Animated.View
             style={[
               styles.swipeOverlay,
@@ -166,19 +161,8 @@ function SwipeableCard({
               <View style={styles.illustrationContainer}>
                 {React.createElement(hungerCueIcons[card.icon], { size: 140 })}
                 {card.text && (
-                  <Text style={styles.illustrationText}>{card.text}</Text>
-                )}
-              </View>
-            ) : card.illustration ? (
-              <View style={styles.illustrationContainer}>
-                <Text style={styles.illustrationEmoji}>
-                  {card.illustration.split(' ')[0]}
-                </Text>
-                {card.illustration.includes(' ') && (
                   <Text style={styles.illustrationText}>
-                    {card.illustration.substring(
-                      card.illustration.indexOf(' ') + 1
-                    )}
+                    {getText(card.text)}
                   </Text>
                 )}
               </View>
@@ -191,18 +175,26 @@ function SwipeableCard({
 }
 
 export default function SwipeGame({ content, onComplete }: Props) {
+  const { t } = useLanguage();
+
   const [phase, setPhase] = useState<'intro' | 'game' | 'reward'>(
-    content.intro ? 'intro' : 'game'
+    content.intro ? 'intro' : 'game',
   );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [showFeedback, setShowFeedback] = useState(false);
   const [lastAnswer, setLastAnswer] = useState<{
     correct: boolean;
-    feedback?: string;
+    feedback?: BilingualText;
   } | null>(null);
 
   const currentCard = content.cards[currentIndex];
+
+  // Helper inside the main component as well
+  const getText = (text: BilingualText | undefined) => {
+    if (!text) return '';
+    return typeof text === 'object' ? t(text) : text;
+  };
 
   const handleIntroNext = () => {
     setPhase('game');
@@ -210,12 +202,8 @@ export default function SwipeGame({ content, onComplete }: Props) {
 
   const handleSwipe = (direction: 'left' | 'right') => {
     if (!currentCard?.answer) return;
-
     const isCorrect = direction === currentCard.answer;
-
-    if (isCorrect) {
-      setCorrectCount((prev) => prev + 1);
-    }
+    if (isCorrect) setCorrectCount((prev) => prev + 1);
 
     setLastAnswer({
       correct: isCorrect,
@@ -227,7 +215,6 @@ export default function SwipeGame({ content, onComplete }: Props) {
   const handleContinue = () => {
     setShowFeedback(false);
     setLastAnswer(null);
-    console.log(1);
     if (currentIndex < content.cards.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else {
@@ -235,7 +222,7 @@ export default function SwipeGame({ content, onComplete }: Props) {
         setPhase('reward');
       } else {
         const finalScore = Math.round(
-          (correctCount / content.cards.length) * 100
+          (correctCount / content.cards.length) * 100,
         );
         onComplete(finalScore);
       }
@@ -252,12 +239,14 @@ export default function SwipeGame({ content, onComplete }: Props) {
       <View style={styles.container}>
         <View style={styles.introContainer}>
           <LioMascot state="excited" size={160} />
-          <Text style={styles.introText}>{content.intro.text}</Text>
+          <Text style={styles.introText}>{getText(content.intro.text)}</Text>
           <TouchableOpacity
             style={styles.startButton}
             onPress={handleIntroNext}
           >
-            <Text style={styles.startButtonText}>Start Learning</Text>
+            <Text style={styles.startButtonText}>
+              {t({ en: 'Start Learning', ka: 'სწავლის დაწყება' })}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -269,7 +258,7 @@ export default function SwipeGame({ content, onComplete }: Props) {
       <View style={styles.container}>
         <View style={styles.rewardContainer}>
           <LioMascot state="happy" size={160} />
-          <Text style={styles.rewardText}>{content.reward.text}</Text>
+          <Text style={styles.rewardText}>{getText(content.reward.text)}</Text>
           {content.reward.reward && (
             <Text style={styles.rewardAmount}>{content.reward.reward}</Text>
           )}
@@ -277,7 +266,9 @@ export default function SwipeGame({ content, onComplete }: Props) {
             style={styles.startButton}
             onPress={handleRewardNext}
           >
-            <Text style={styles.startButtonText}>Continue</Text>
+            <Text style={styles.startButtonText}>
+              {t({ en: 'Continue', ka: 'გაგრძელება' })}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -306,7 +297,6 @@ export default function SwipeGame({ content, onComplete }: Props) {
 
       {showFeedback && lastAnswer && (
         <Animated.View
-          entering={undefined}
           style={[
             styles.feedbackOverlay,
             lastAnswer.correct
@@ -315,17 +305,23 @@ export default function SwipeGame({ content, onComplete }: Props) {
           ]}
         >
           <Text style={styles.feedbackTitle}>
-            {lastAnswer.correct ? 'Correct!' : 'Not quite!'}
+            {lastAnswer.correct
+              ? t({ en: 'Correct!', ka: 'სწორია!' })
+              : t({ en: 'Not quite!', ka: 'არასწორია!' })}
           </Text>
           {lastAnswer.feedback && (
-            <Text style={styles.feedbackText}>{lastAnswer.feedback}</Text>
+            <Text style={styles.feedbackText}>
+              {getText(lastAnswer.feedback)}
+            </Text>
           )}
           <TouchableOpacity
             style={styles.continueButton}
             onPress={handleContinue}
           >
             <Text style={styles.continueButtonText}>
-              {currentIndex < content.cards.length - 1 ? 'Next Card' : 'Finish'}
+              {currentIndex < content.cards.length - 1
+                ? t({ en: 'Next Card', ka: 'შემდეგი' })
+                : t({ en: 'Finish', ka: 'დასრულება' })}
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -335,24 +331,30 @@ export default function SwipeGame({ content, onComplete }: Props) {
         <View style={styles.instructionRow}>
           <View style={[styles.instructionBadge, styles.leftBadge]}>
             <ChevronLeft size={20} color={Colors.white} />
-            <Text style={styles.instructionBadgeText}>Not Hungry</Text>
+            <Text style={styles.instructionBadgeText}>
+              {t({ en: 'Not Hungry', ka: 'არ შია' })}
+            </Text>
           </View>
           <View style={[styles.instructionBadge, styles.rightBadge]}>
-            <Text style={styles.instructionBadgeText}>Hungry</Text>
+            <Text style={styles.instructionBadgeText}>
+              {t({ en: 'Hungry', ka: 'შია' })}
+            </Text>
             <ChevronRight size={20} color={Colors.white} />
           </View>
         </View>
-        <Text style={styles.instructionText}>Swipe the card left or right</Text>
+        <Text style={styles.instructionText}>
+          {t({
+            en: 'Swipe the card left or right',
+            ka: 'გაუსვით ბარათს მარცხნივ ან მარჯვნივ',
+          })}
+        </Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
   introContainer: {
     flex: 1,
     alignItems: 'center',
@@ -399,10 +401,7 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.bold,
     color: Colors.white,
   },
-  header: {
-    alignItems: 'center',
-    paddingVertical: Spacing.lg,
-  },
+  header: { alignItems: 'center', paddingVertical: Spacing.lg },
   progress: {
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.semibold,
@@ -414,10 +413,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     paddingTop: Spacing.xl,
   },
-  cardWrapper: {
-    width: CARD_WIDTH,
-    height: 420,
-  },
+  cardWrapper: { width: CARD_WIDTH, height: 420 },
   card: {
     flex: 1,
     backgroundColor: Colors.white,
@@ -434,14 +430,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
-  leftOverlay: {
-    left: 0,
-    backgroundColor: Colors.error + '90',
-  },
-  rightOverlay: {
-    right: 0,
-    backgroundColor: Colors.success + '90',
-  },
+  leftOverlay: { left: 0, backgroundColor: Colors.error + '90' },
+  rightOverlay: { right: 0, backgroundColor: Colors.success + '90' },
   cardContent: {
     flex: 1,
     alignItems: 'center',
@@ -459,11 +449,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     gap: Spacing.md,
   },
-  illustrationEmoji: {
-    fontSize: 64,
-    textAlign: 'center',
-    marginBottom: Spacing.md,
-  },
   illustrationText: {
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.semibold,
@@ -471,13 +456,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: Typography.sizes.lg * 1.4,
     paddingHorizontal: Spacing.lg,
-  },
-  cardText: {
-    fontSize: Typography.sizes.base,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.gray[800],
-    textAlign: 'center',
-    lineHeight: Typography.sizes.base * 1.4,
   },
   feedbackOverlay: {
     position: 'absolute',
@@ -490,12 +468,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...Shadow.large,
   },
-  correctOverlay: {
-    backgroundColor: Colors.success,
-  },
-  incorrectOverlay: {
-    backgroundColor: Colors.error,
-  },
+  correctOverlay: { backgroundColor: Colors.success },
+  incorrectOverlay: { backgroundColor: Colors.error },
   feedbackTitle: {
     fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
@@ -540,12 +514,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
   },
-  leftBadge: {
-    backgroundColor: Colors.error,
-  },
-  rightBadge: {
-    backgroundColor: Colors.success,
-  },
+  leftBadge: { backgroundColor: Colors.error },
+  rightBadge: { backgroundColor: Colors.success },
   instructionBadgeText: {
     fontSize: Typography.sizes.sm,
     fontWeight: Typography.weights.semibold,
