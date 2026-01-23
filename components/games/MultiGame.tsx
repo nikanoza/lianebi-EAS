@@ -37,8 +37,9 @@ type Section = {
   min?: number;
   max?: number;
   optimal?: number;
-  safeRange?: [number, number];
+  targetRange?: { min: number; max: number };
   unit?: string;
+  paths?: any[];
 };
 
 type Props = {
@@ -132,6 +133,7 @@ export default function MultiGame({ content, onComplete }: Props) {
 
   // --- 2. PLAYING SECTIONS ---
   const currentSection = content.sections[currentSectionIndex];
+
   const renderSection = () => {
     switch (currentSection.type) {
       case 'quiz':
@@ -148,8 +150,8 @@ export default function MultiGame({ content, onComplete }: Props) {
             content={{
               // USE getText() HERE
               instructions: getText(currentSection.instructions),
-              tempo: currentSection.tempo || 100,
-              duration: currentSection.duration || 30,
+              tempo: currentSection.tempo || 0,
+              duration: currentSection.duration || 0,
             }}
             onComplete={handleSectionComplete}
           />
@@ -204,14 +206,25 @@ export default function MultiGame({ content, onComplete }: Props) {
               min: currentSection.min || 0,
               max: currentSection.max || 0,
               optimal: currentSection.optimal || 0,
-              safeRange: currentSection.safeRange || [0, 0],
+              targetRange: currentSection.targetRange || { min: 0, max: 0 },
               unit: currentSection.unit || '',
+              feedbackHigh: t({ en: 'Too High!', ka: 'ძალიან მაღალია!' }),
+              feedbackLow: t({ en: 'Too Low!', ka: 'ძალიან დაბალია!' }),
+              feedbackPerfect: t({ en: 'Perfect!', ka: 'სრულყოფილია!' }),
             }}
             onComplete={handleSectionComplete}
           />
         );
       case 'tracing':
-        return <MassageGame onComplete={handleSectionComplete} />;
+        return (
+          <MassageGame
+            content={{
+              instructions: currentSection.instructions || { en: '', ka: '' },
+              paths: currentSection.paths || [],
+            }}
+            onComplete={handleSectionComplete}
+          />
+        );
       case 'milestoneCheck':
         return (
           <MilestoneSwipeGame
