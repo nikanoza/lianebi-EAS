@@ -215,16 +215,7 @@ export default function LoginScreen() {
                 <Text style={styles.socialButtonText}>Google</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={handleFacebookSignIn}
-                disabled={loading || socialLoading}
-              >
-                <View style={[styles.socialIconContainer, styles.facebookIcon]}>
-                  <Text style={styles.socialIcon}>f</Text>
-                </View>
-                <Text style={styles.socialButtonText}>Facebook</Text>
-              </TouchableOpacity>
+             
             </View>
 
             <TouchableOpacity
