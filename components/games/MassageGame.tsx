@@ -11,38 +11,31 @@ import Animated, {
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
 import { Check } from 'lucide-react-native';
 import LioMascot from '@/components/LioMascot';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
-const CANVAS_SIZE = width - 40;
-const TOLERANCE = 40;
 
-// --- HELPER WORKLET ---
+// --- FIX: Cap the size so it doesn't get huge on tablets/desktop ---
+const CANVAS_SIZE = Math.min(width - 40, 340);
+const TOLERANCE = 45;
+
 function getDistance(x1: number, y1: number, x2: number, y2: number) {
-  'worklet'; // <--- THIS PREVENTS THE CRASH
+  'worklet';
   return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 }
 
-const SHAPES = [
-  {
-    id: 'path_i',
-    label: "Step 1: The 'I'",
-    instruction: 'Stroke down the left side',
-    svgPath: `M ${CANVAS_SIZE * 0.75} ${CANVAS_SIZE * 0.2} L ${
-      CANVAS_SIZE * 0.75
-    } ${CANVAS_SIZE * 0.8}`,
+// --- GEOMETRY DEFINITIONS ---
+const SHAPE_GEOMETRY: Record<string, any> = {
+  I: {
+    svgPath: `M ${CANVAS_SIZE * 0.75} ${CANVAS_SIZE * 0.2} L ${CANVAS_SIZE * 0.75} ${CANVAS_SIZE * 0.8}`,
     checkpoints: [
       { x: CANVAS_SIZE * 0.75, y: CANVAS_SIZE * 0.2 },
       { x: CANVAS_SIZE * 0.75, y: CANVAS_SIZE * 0.5 },
       { x: CANVAS_SIZE * 0.75, y: CANVAS_SIZE * 0.8 },
     ],
   },
-  {
-    id: 'path_l',
-    label: "Step 2: The 'L'",
-    instruction: 'Across and down',
-    svgPath: `M ${CANVAS_SIZE * 0.25} ${CANVAS_SIZE * 0.2} L ${
-      CANVAS_SIZE * 0.75
-    } ${CANVAS_SIZE * 0.2} L ${CANVAS_SIZE * 0.75} ${CANVAS_SIZE * 0.8}`,
+  L: {
+    svgPath: `M ${CANVAS_SIZE * 0.25} ${CANVAS_SIZE * 0.2} L ${CANVAS_SIZE * 0.75} ${CANVAS_SIZE * 0.2} L ${CANVAS_SIZE * 0.75} ${CANVAS_SIZE * 0.8}`,
     checkpoints: [
       { x: CANVAS_SIZE * 0.25, y: CANVAS_SIZE * 0.2 },
       { x: CANVAS_SIZE * 0.75, y: CANVAS_SIZE * 0.2 },
@@ -50,15 +43,8 @@ const SHAPES = [
       { x: CANVAS_SIZE * 0.75, y: CANVAS_SIZE * 0.8 },
     ],
   },
-  {
-    id: 'path_u',
-    label: "Step 3: The 'U'",
-    instruction: 'Upside down U from right to left',
-    svgPath: `M ${CANVAS_SIZE * 0.25} ${CANVAS_SIZE * 0.8} L ${
-      CANVAS_SIZE * 0.25
-    } ${CANVAS_SIZE * 0.2} L ${CANVAS_SIZE * 0.75} ${CANVAS_SIZE * 0.2} L ${
-      CANVAS_SIZE * 0.75
-    } ${CANVAS_SIZE * 0.8}`,
+  U: {
+    svgPath: `M ${CANVAS_SIZE * 0.25} ${CANVAS_SIZE * 0.8} L ${CANVAS_SIZE * 0.25} ${CANVAS_SIZE * 0.2} L ${CANVAS_SIZE * 0.75} ${CANVAS_SIZE * 0.2} L ${CANVAS_SIZE * 0.75} ${CANVAS_SIZE * 0.8}`,
     checkpoints: [
       { x: CANVAS_SIZE * 0.25, y: CANVAS_SIZE * 0.8 },
       { x: CANVAS_SIZE * 0.25, y: CANVAS_SIZE * 0.2 },
@@ -67,30 +53,53 @@ const SHAPES = [
       { x: CANVAS_SIZE * 0.75, y: CANVAS_SIZE * 0.8 },
     ],
   },
-];
+};
+
+type BilingualText = string | { en: string; ka: string };
+
+type PathItem = {
+  id: string;
+  label: BilingualText;
+  hint: BilingualText;
+  shape: string;
+};
 
 type Props = {
+  content: {
+    instructions: BilingualText;
+    paths: PathItem[];
+  };
   onComplete: (score: number) => void;
 };
 
-export default function MassageGame({ onComplete }: Props) {
+export default function MassageGame({ content, onComplete }: Props) {
+  const { t } = useLanguage();
   const [currentShapeIndex, setCurrentShapeIndex] = useState(0);
   const [userPath, setUserPath] = useState<string>('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [completedAll, setCompletedAll] = useState(false);
 
-  // --- REANIMATED SHARED VALUES (UI Thread State) ---
+  const getText = (text: BilingualText | undefined) => {
+    if (!text) return '';
+    return typeof text === 'object' ? t(text) : text;
+  };
+
   const currentCheckPointIndex = useSharedValue(0);
   const isDrawing = useSharedValue(false);
-  const tempPath = useSharedValue(''); // Builds the string on UI thread
+  const tempPath = useSharedValue('');
 
-  const currentShape = SHAPES[currentShapeIndex];
+  // Fallback to empty array if paths is undefined (prevents crash)
+  const paths = content?.paths || [];
+  const pathItem = paths[currentShapeIndex] || {
+    label: '',
+    hint: '',
+    shape: 'I',
+  };
+  const geometry = SHAPE_GEOMETRY[pathItem.shape] || SHAPE_GEOMETRY['I'];
 
-  // Reset logic when shape changes
   useEffect(() => {
     setUserPath('');
     setIsSuccess(false);
-    // Reset SharedValues on UI thread
     runOnJS(resetSharedValues)();
   }, [currentShapeIndex]);
 
@@ -106,7 +115,7 @@ export default function MassageGame({ onComplete }: Props) {
     setIsSuccess(true);
 
     setTimeout(() => {
-      if (currentShapeIndex < SHAPES.length - 1) {
+      if (currentShapeIndex < paths.length - 1) {
         setCurrentShapeIndex((prev) => prev + 1);
       } else {
         setCompletedAll(true);
@@ -118,15 +127,11 @@ export default function MassageGame({ onComplete }: Props) {
   const pan = Gesture.Pan()
     .onStart((e) => {
       if (isSuccess || completedAll) return;
-
-      const startPoint = currentShape.checkpoints[0];
+      const startPoint = geometry.checkpoints[0];
       const dist = getDistance(e.x, e.y, startPoint.x, startPoint.y);
-
       if (dist < TOLERANCE) {
         isDrawing.value = true;
         currentCheckPointIndex.value = 1;
-
-        // Start path string
         tempPath.value = `${e.x},${e.y}`;
         runOnJS(setUserPath)(tempPath.value);
       } else {
@@ -135,21 +140,15 @@ export default function MassageGame({ onComplete }: Props) {
     })
     .onUpdate((e) => {
       if (!isDrawing.value || isSuccess) return;
-
-      // Append to path string on UI thread
       tempPath.value = `${tempPath.value} ${e.x},${e.y}`;
       runOnJS(setUserPath)(tempPath.value);
-
-      // Logic check
       const targetIndex = currentCheckPointIndex.value;
-      if (targetIndex < currentShape.checkpoints.length) {
-        const target = currentShape.checkpoints[targetIndex];
+      if (targetIndex < geometry.checkpoints.length) {
+        const target = geometry.checkpoints[targetIndex];
         const dist = getDistance(e.x, e.y, target.x, target.y);
-
         if (dist < TOLERANCE) {
           currentCheckPointIndex.value += 1;
-
-          if (currentCheckPointIndex.value >= currentShape.checkpoints.length) {
+          if (currentCheckPointIndex.value >= geometry.checkpoints.length) {
             isDrawing.value = false;
             runOnJS(handleSuccess)();
           }
@@ -168,8 +167,15 @@ export default function MassageGame({ onComplete }: Props) {
     return (
       <View style={styles.centerContainer}>
         <LioMascot state="happy" size={160} />
-        <Text style={styles.title}>Massage Master!</Text>
-        <Text style={styles.subtitle}>Baby feels much better now.</Text>
+        <Text style={styles.title}>
+          {t({ en: 'Massage Master!', ka: 'მასაჟის ოსტატი!' })}
+        </Text>
+        <Text style={styles.subtitle}>
+          {t({
+            en: 'Baby feels much better now.',
+            ka: 'ბავშვი ახლა თავს უკეთ გრძნობს.',
+          })}
+        </Text>
       </View>
     );
   }
@@ -177,28 +183,25 @@ export default function MassageGame({ onComplete }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>{currentShape.label}</Text>
-        <Text style={styles.instruction}>{currentShape.instruction}</Text>
+        <Text style={styles.title}>{getText(pathItem.label)}</Text>
+        <Text style={styles.instruction}>{getText(pathItem.hint)}</Text>
       </View>
-
       <View style={styles.canvasContainer}>
         <View style={styles.tummyBg}>
           <View style={styles.bellyButton} />
         </View>
-
         <GestureDetector gesture={pan}>
           <View style={styles.svgWrapper}>
             <Svg height={CANVAS_SIZE} width={CANVAS_SIZE}>
-              {/* Guide Lines */}
               <Path
-                d={currentShape.svgPath}
-                stroke={Colors.gray[300]}
-                strokeWidth={30}
+                d={geometry.svgPath}
+                stroke={Colors.gray[200]}
+                strokeWidth={40}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               <Path
-                d={currentShape.svgPath}
+                d={geometry.svgPath}
                 stroke={Colors.primary}
                 strokeWidth={4}
                 strokeDasharray="10, 10"
@@ -206,16 +209,12 @@ export default function MassageGame({ onComplete }: Props) {
                 strokeLinejoin="round"
                 opacity={0.5}
               />
-
-              {/* Target Dot */}
               <Circle
-                cx={currentShape.checkpoints[0].x}
-                cy={currentShape.checkpoints[0].y}
+                cx={geometry.checkpoints[0].x}
+                cy={geometry.checkpoints[0].y}
                 r={12}
                 fill={Colors.accent}
               />
-
-              {/* User Line */}
               <Polyline
                 points={userPath}
                 fill="none"
@@ -228,7 +227,6 @@ export default function MassageGame({ onComplete }: Props) {
             </Svg>
           </View>
         </GestureDetector>
-
         {isSuccess && (
           <Animated.View
             entering={FadeIn}
@@ -236,13 +234,16 @@ export default function MassageGame({ onComplete }: Props) {
             style={styles.successOverlay}
           >
             <Check size={64} color="white" />
-            <Text style={styles.successText}>Great!</Text>
+            <Text style={styles.successText}>
+              {t({ en: 'Great!', ka: 'ყოჩაღ!' })}
+            </Text>
           </Animated.View>
         )}
       </View>
-
       <View style={styles.footer}>
-        <Text style={styles.helperText}>{currentShapeIndex + 1} / 3</Text>
+        <Text style={styles.helperText}>
+          {currentShapeIndex + 1} / {paths.length}
+        </Text>
       </View>
     </View>
   );
@@ -260,15 +261,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.lg,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
+  header: { alignItems: 'center', marginBottom: Spacing.xl },
   title: {
     fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
     color: Colors.gray[800],
     marginBottom: Spacing.xs,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: Typography.sizes.lg,
@@ -292,7 +291,8 @@ const styles = StyleSheet.create({
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
     backgroundColor: '#FFE0BD',
-    borderRadius: BorderRadius.full,
+    // FIX: Dynamic radius for perfect circle
+    borderRadius: CANVAS_SIZE / 2,
     opacity: 0.3,
     justifyContent: 'center',
     alignItems: 'center',
@@ -304,15 +304,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#EAC09A',
     opacity: 0.6,
   },
-  svgWrapper: {
-    width: CANVAS_SIZE,
-    height: CANVAS_SIZE,
-    zIndex: 10,
-  },
+  svgWrapper: { width: CANVAS_SIZE, height: CANVAS_SIZE, zIndex: 10 },
   successOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(76, 175, 80, 0.3)',
-    borderRadius: BorderRadius.full,
+    borderRadius: 9999, // Use huge number or calculate dynamically if needed, 9999 works for circles
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 20,
@@ -323,12 +319,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     marginTop: 10,
   },
-  footer: {
-    alignItems: 'center',
-    marginTop: Spacing.xl,
-  },
-  helperText: {
-    color: Colors.gray[400],
-    fontWeight: 'bold',
-  },
+  footer: { alignItems: 'center', marginTop: Spacing.xl },
+  helperText: { color: Colors.gray[400], fontWeight: 'bold' },
 });

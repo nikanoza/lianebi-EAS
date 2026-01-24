@@ -10,15 +10,68 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useLanguage } from '@/contexts/LanguageContext';
 import LioMascot from '@/components/LioMascot';
 import { Flame, Droplet, Lock } from 'lucide-react-native';
-import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
+import {
+  Colors,
+  Spacing,
+  BorderRadius,
+  Typography,
+  Shadow,
+} from '@/constants/theme';
+
+// 2. Define Static Translations
+const translations = {
+  headerTitle: {
+    en: 'Your Journey',
+    ka: 'შენი მოგზაურობა',
+  },
+  completed: {
+    en: 'completed',
+    ka: 'დასრულებულია',
+  },
+  startJourney: {
+    en: 'Start Journey',
+    ka: 'დაწყება',
+  },
+  continueJourney: {
+    en: 'Continue Journey',
+    ka: 'გაგრძელება',
+  },
+  lockedMessage: {
+    en: 'Complete previous units to unlock',
+    ka: 'დაასრულეთ წინა ნაწილები გასახსნელად',
+  },
+  retry: {
+    en: 'Retry',
+    ka: 'თავიდან ცდა',
+  },
+  noCourses: {
+    en: 'No courses available yet',
+    ka: 'კურსები ჯერ არ არის ხელმისაწვდომი',
+  },
+  reloadCourses: {
+    en: 'Reload Courses',
+    ka: 'კურსების განახლება',
+  },
+  loadError: {
+    en: 'Failed to load courses',
+    ka: 'კურსების ჩატვირთვა ვერ მოხერხდა',
+  },
+};
+
+// 3. Update Unit Type to reflect JSONB columns
+type LocalizedString = {
+  en: string;
+  ka: string;
+};
 
 type Unit = {
   id: string;
-  title: string;
-  description: string | null;
-  age_range: string | null;
+  title: LocalizedString; // Changed from string
+  description: LocalizedString | null; // Changed from string
+  age_range: LocalizedString | null; // Changed from string
   order_index: number;
   is_active: boolean;
   image_key: string | null;
@@ -31,11 +84,14 @@ type Progress = {
 
 export default function HomeHub() {
   const { profile } = useAuth();
+  const { t } = useLanguage(); // <--- 4. Get translation helper
   const router = useRouter();
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [unitProgress, setUnitProgress] = useState<Record<string, Progress>>({});
+  const [unitProgress, setUnitProgress] = useState<Record<string, Progress>>(
+    {},
+  );
 
   useEffect(() => {
     fetchUnits();
@@ -57,23 +113,21 @@ export default function HomeHub() {
 
       if (unitsError) {
         console.error('Error fetching units:', unitsError);
-        setError('Failed to load courses: ' + unitsError.message);
+        setError(t(translations.loadError)); // Localized error
         throw unitsError;
       }
 
       if (unitsData) {
-        console.log('Fetched units:', unitsData.length, unitsData);
         setUnits(unitsData);
         if (profile) {
           await fetchProgress(unitsData);
         }
       } else {
-        console.log('No units data returned');
         setUnits([]);
       }
     } catch (error: any) {
       console.error('Error fetching units:', error);
-      setError('Failed to load courses. Please try again.');
+      setError(t(translations.loadError));
     } finally {
       setLoading(false);
     }
@@ -95,9 +149,9 @@ export default function HomeHub() {
           .from('user_progress')
           .select('completed')
           .eq('user_id', profile.id)
-          .in('lesson_id', lessons?.map(l => l.id) || []);
+          .in('lesson_id', lessons?.map((l) => l.id) || []);
 
-        const completed = userProgress?.filter(p => p.completed).length || 0;
+        const completed = userProgress?.filter((p) => p.completed).length || 0;
         const total = lessons?.length || 0;
 
         progressMap[unit.id] = { completed, total };
@@ -126,7 +180,8 @@ export default function HomeHub() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>Your Journey</Text>
+          {/* 5. Translated Header Title */}
+          <Text style={styles.headerTitle}>{t(translations.headerTitle)}</Text>
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
               <Flame size={20} color={Colors.white} />
@@ -149,27 +204,35 @@ export default function HomeHub() {
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={fetchUnits}>
-              <Text style={styles.retryButtonText}>Retry</Text>
+              <Text style={styles.retryButtonText}>
+                {t(translations.retry)}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
 
         {!error && !loading && units.length === 0 && (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No courses available yet</Text>
-            <Text style={styles.debugText}>Debug: Profile ID: {profile?.id || 'Not loaded'}</Text>
+            <Text style={styles.emptyText}>{t(translations.noCourses)}</Text>
+            {/* Kept debug text in English as it's for devs */}
+            <Text style={styles.debugText}>
+              Debug: Profile ID: {profile?.id || 'Not loaded'}
+            </Text>
             <TouchableOpacity style={styles.retryButton} onPress={fetchUnits}>
-              <Text style={styles.retryButtonText}>Reload Courses</Text>
+              <Text style={styles.retryButtonText}>
+                {t(translations.reloadCourses)}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {units.map((unit, index) => {
+        {units.map((unit) => {
           const progress = unitProgress[unit.id] || { completed: 0, total: 0 };
           const isLocked = !unit.is_active;
-          const progressPercentage = progress.total > 0
-            ? (progress.completed / progress.total) * 100
-            : 0;
+          const progressPercentage =
+            progress.total > 0
+              ? (progress.completed / progress.total) * 100
+              : 0;
 
           return (
             <TouchableOpacity
@@ -187,7 +250,7 @@ export default function HomeHub() {
                     </View>
                   ) : (
                     <LioMascot
-                      state={unit.image_key as any || 'happy'}
+                      state={(unit.image_key as any) || 'happy'}
                       size={100}
                     />
                   )}
@@ -195,19 +258,35 @@ export default function HomeHub() {
 
                 <View style={styles.unitInfo}>
                   <View style={styles.unitHeader}>
-                    <Text style={[styles.unitTitle, isLocked && styles.unitTitleLocked]}>
-                      {unit.title}
+                    {/* 6. Dynamic Translation for Title */}
+                    <Text
+                      style={[
+                        styles.unitTitle,
+                        isLocked && styles.unitTitleLocked,
+                      ]}
+                    >
+                      {t(unit.title)}
                     </Text>
+
                     {unit.age_range && (
                       <View style={styles.ageRangeBadge}>
-                        <Text style={styles.ageRangeText}>{unit.age_range}</Text>
+                        {/* 7. Dynamic Translation for Age Range */}
+                        <Text style={styles.ageRangeText}>
+                          {t(unit.age_range)}
+                        </Text>
                       </View>
                     )}
                   </View>
 
                   {unit.description && (
-                    <Text style={[styles.unitDescription, isLocked && styles.unitDescriptionLocked]}>
-                      {unit.description}
+                    /* 8. Dynamic Translation for Description */
+                    <Text
+                      style={[
+                        styles.unitDescription,
+                        isLocked && styles.unitDescriptionLocked,
+                      ]}
+                    >
+                      {t(unit.description)}
                     </Text>
                   )}
 
@@ -217,12 +296,13 @@ export default function HomeHub() {
                         <View
                           style={[
                             styles.progressFill,
-                            { width: `${progressPercentage}%` }
+                            { width: `${progressPercentage}%` },
                           ]}
                         />
                       </View>
                       <Text style={styles.progressText}>
-                        {progress.completed}/{progress.total} completed
+                        {progress.completed}/{progress.total}{' '}
+                        {t(translations.completed)}
                       </Text>
                     </View>
                   )}
@@ -231,7 +311,9 @@ export default function HomeHub() {
                     <View style={styles.unitButtonContainer}>
                       <View style={styles.continueButton}>
                         <Text style={styles.continueButtonText}>
-                          {progress.completed === 0 ? 'Start Journey' : 'Continue Journey'}
+                          {progress.completed === 0
+                            ? t(translations.startJourney)
+                            : t(translations.continueJourney)}
                         </Text>
                       </View>
                     </View>
@@ -240,7 +322,9 @@ export default function HomeHub() {
                   {isLocked && (
                     <View style={styles.lockedBadge}>
                       <Lock size={16} color={Colors.gray[500]} />
-                      <Text style={styles.lockedText}>Complete previous units to unlock</Text>
+                      <Text style={styles.lockedText}>
+                        {t(translations.lockedMessage)}
+                      </Text>
                     </View>
                   )}
                 </View>

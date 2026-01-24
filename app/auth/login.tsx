@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import Logo from '@/components/Logo';
+import { useLanguage } from '@/contexts/LanguageContext'; // 1. Import Hook
 import {
   Colors,
   Spacing,
@@ -28,12 +29,16 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
   const [error, setError] = useState('');
+
   const { signIn, signUp, signInWithGoogle, signInWithFacebook } = useAuth();
+  const { t } = useLanguage(); // 2. Init Hook
   const router = useRouter();
 
   const handleAuth = async () => {
     if (!email || !password) {
-      setError('Please fill in all fields');
+      setError(
+        t({ en: 'Please fill in all fields', ka: 'გთხოვთ შეავსოთ ყველა ველი' }),
+      );
       return;
     }
 
@@ -46,12 +51,15 @@ export default function LoginScreen() {
         : await signIn(email, password);
 
       if (authError) {
+        // You might want to map specific Supabase errors to bilingual text here
         setError(authError.message);
       } else {
         router.replace('/(tabs)');
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(
+        err.message || t({ en: 'An error occurred', ka: 'დაფიქსირდა შეცდომა' }),
+      );
     } finally {
       setLoading(false);
     }
@@ -66,7 +74,9 @@ export default function LoginScreen() {
         setError(authError.message);
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(
+        err.message || t({ en: 'An error occurred', ka: 'დაფიქსირდა შეცდომა' }),
+      );
     } finally {
       setSocialLoading(false);
     }
@@ -81,7 +91,9 @@ export default function LoginScreen() {
         setError(authError.message);
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(
+        err.message || t({ en: 'An error occurred', ka: 'დაფიქსირდა შეცდომა' }),
+      );
     } finally {
       setSocialLoading(false);
     }
@@ -98,8 +110,12 @@ export default function LoginScreen() {
       >
         <View style={styles.header}>
           <Logo size={200} />
-          <Text style={styles.appTitle}>Lianebi App</Text>
-          <Text style={styles.subtitle}>Nurture to Learn</Text>
+          <Text style={styles.appTitle}>
+            {t({ en: 'Lianebi App', ka: 'ლიანები' })}
+          </Text>
+          <Text style={styles.subtitle}>
+            {t({ en: 'Nurture to Learn', ka: 'იზრუნე და ისწავლე' })}
+          </Text>
         </View>
 
         <View style={styles.card}>
@@ -107,17 +123,30 @@ export default function LoginScreen() {
             <View style={styles.nestIcon}>
               <Text style={styles.nestEmoji}>🪺</Text>
             </View>
-            <Text style={styles.cardTitle}>Keep your progress safe</Text>
+            <Text style={styles.cardTitle}>
+              {t({
+                en: 'Keep your progress safe',
+                ka: 'შეინახე შენი პროგრესი',
+              })}
+            </Text>
             <Text style={styles.cardSubtitle}>
               {isSignUp
-                ? 'Create an account to start your journey'
-                : 'Welcome back to your learning journey'}
+                ? t({
+                    en: 'Create an account to start your journey',
+                    ka: 'შექმენი ანგარიში მოგზაურობის დასაწყებად',
+                  })
+                : t({
+                    en: 'Welcome back to your learning journey',
+                    ka: 'კეთილი იყოს შენი დაბრუნება',
+                  })}
             </Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>
+                {t({ en: 'Email', ka: 'ელ-ფოსტა' })}
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="your@email.com"
@@ -131,7 +160,9 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={styles.label}>
+                {t({ en: 'Password', ka: 'პაროლი' })}
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="••••••••"
@@ -157,14 +188,18 @@ export default function LoginScreen() {
                 <ActivityIndicator color={Colors.white} />
               ) : (
                 <Text style={styles.primaryButtonText}>
-                  {isSignUp ? 'Create Account' : 'Sign In'}
+                  {isSignUp
+                    ? t({ en: 'Create Account', ka: 'რეგისტრაცია' })
+                    : t({ en: 'Sign In', ka: 'შესვლა' })}
                 </Text>
               )}
             </TouchableOpacity>
 
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or continue with</Text>
+              <Text style={styles.dividerText}>
+                {t({ en: 'or continue with', ka: 'ან გააგრძელე' })}
+              </Text>
               <View style={styles.dividerLine} />
             </View>
 
@@ -202,14 +237,25 @@ export default function LoginScreen() {
             >
               <Text style={styles.switchButtonText}>
                 {isSignUp
-                  ? 'Already have an account? Sign In'
-                  : "Don't have an account? Sign Up"}
+                  ? t({
+                      en: 'Already have an account? Sign In',
+                      ka: 'უკვე გაქვს ანგარიში? შესვლა',
+                    })
+                  : t({
+                      en: "Don't have an account? Sign Up",
+                      ka: 'არ გაქვს ანგარიში? დარეგისტრირება',
+                    })}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        <Text style={styles.footer}>Start your parenting journey with Lio</Text>
+        <Text style={styles.footer}>
+          {t({
+            en: 'Start your parenting journey with Lio',
+            ka: 'დაიწყე მშობლობის მოგზაურობა ლიოსთან ერთად',
+          })}
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -269,6 +315,7 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.semibold,
     color: Colors.gray[800],
     marginBottom: Spacing.xs,
+    textAlign: 'center',
   },
   cardSubtitle: {
     fontSize: Typography.sizes.sm,

@@ -30,12 +30,14 @@ import {
   HelpCircle,
 } from 'lucide-react-native';
 import LioMascot from '@/components/LioMascot';
+// 1. IMPORT LANGUAGE HOOK
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.lg * 2;
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
 
-// --- 1. INTERNAL ICON MAP (Covers all Day 1-9 topics) ---
+// --- INTERNAL ICON MAP ---
 const ICON_MAP: Record<string, React.ElementType> = {
   check: Check,
   alert: AlertTriangle,
@@ -49,20 +51,22 @@ const ICON_MAP: Record<string, React.ElementType> = {
   doctor: Stethoscope,
 };
 
-// --- TYPES ---
+// --- 2. TYPES (Updated for Bilingual) ---
+type BilingualText = string | { en: string; ka: string };
+
 export type Card = {
   id: string;
   icon?: string;
-  text: string;
+  text: BilingualText;
   answer: 'left' | 'right';
-  feedback: string;
+  feedback: BilingualText;
 };
 
 type Props = {
   content: {
-    intro?: { text: string };
+    intro?: { text: BilingualText };
     cards: Card[];
-    reward?: { text: string; reward: string };
+    reward?: { text: BilingualText; reward: string };
   };
   onComplete: (score: number) => void;
 };
@@ -72,10 +76,12 @@ function SwipeableCard({
   card,
   onSwipe,
   isActive,
+  getText,
 }: {
   card: Card;
   onSwipe: (dir: 'left' | 'right') => void;
   isActive: boolean;
+  getText: (text: BilingualText | undefined) => string;
 }) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -105,7 +111,7 @@ function SwipeableCard({
       translateX.value,
       [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
       [-15, 0, 15],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
     return {
       transform: [
@@ -117,7 +123,6 @@ function SwipeableCard({
     };
   });
 
-  // Get Icon
   const IconComponent = card.icon
     ? ICON_MAP[card.icon] || HelpCircle
     : HelpCircle;
@@ -153,7 +158,7 @@ function SwipeableCard({
             <View style={styles.iconBadge}>
               <IconComponent size={60} color={Colors.white} />
             </View>
-            <Text style={styles.cardText}>{card.text}</Text>
+            <Text style={styles.cardText}>{getText(card.text)}</Text>
           </View>
         </View>
       </Animated.View>
@@ -163,16 +168,23 @@ function SwipeableCard({
 
 // --- MAIN GAME ---
 export default function MilestoneSwipeGame({ content, onComplete }: Props) {
+  const { t } = useLanguage();
   const [phase, setPhase] = useState<'intro' | 'game' | 'reward'>(
-    content.intro ? 'intro' : 'game'
+    content.intro ? 'intro' : 'game',
   );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [showFeedback, setShowFeedback] = useState(false);
   const [lastAnswer, setLastAnswer] = useState<{
     correct: boolean;
-    feedback: string;
+    feedback: BilingualText;
   } | null>(null);
+
+  // Helper
+  const getText = (text: BilingualText | undefined) => {
+    if (!text) return '';
+    return typeof text === 'object' ? t(text) : text;
+  };
 
   const currentCard = content.cards[currentIndex];
 
@@ -207,10 +219,14 @@ export default function MilestoneSwipeGame({ content, onComplete }: Props) {
     return (
       <View style={styles.centerContainer}>
         <LioMascot state="excited" size={160} />
-        <Text style={styles.introTitle}>The Final Check!</Text>
-        <Text style={styles.introText}>{content.intro.text}</Text>
+        <Text style={styles.introTitle}>
+          {t({ en: 'The Final Check!', ka: 'საბოლოო შემოწმება!' })}
+        </Text>
+        <Text style={styles.introText}>{getText(content.intro.text)}</Text>
         <TouchableOpacity style={styles.btn} onPress={() => setPhase('game')}>
-          <Text style={styles.btnText}>Start Exam</Text>
+          <Text style={styles.btnText}>
+            {t({ en: 'Start Exam', ka: 'გამოცდის დაწყება' })}
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -220,14 +236,19 @@ export default function MilestoneSwipeGame({ content, onComplete }: Props) {
     return (
       <View style={styles.centerContainer}>
         <LioMascot state="happy" size={160} />
-        <Text style={styles.introTitle}>All Done!</Text>
-        <Text style={styles.introText}>{content.reward.text}</Text>
+        <Text style={styles.introTitle}>
+          {t({ en: 'All Done!', ka: 'დასრულდა!' })}
+        </Text>
+        <Text style={styles.introText}>{getText(content.reward.text)}</Text>
         <Text style={styles.rewardAmount}>{content.reward.reward}</Text>
         <Text style={styles.scoreText}>
-          You got {correctCount} out of {content.cards.length} right!
+          {t({ en: 'You got', ka: 'თქვენ გამოიცანით' })} {correctCount} /{' '}
+          {content.cards.length}!
         </Text>
         <TouchableOpacity style={styles.btn} onPress={finishGame}>
-          <Text style={styles.btnText}>Finish Course</Text>
+          <Text style={styles.btnText}>
+            {t({ en: 'Finish Course', ka: 'კურსის დასრულება' })}
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -236,7 +257,9 @@ export default function MilestoneSwipeGame({ content, onComplete }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.progressLabel}>FINAL MILESTONE</Text>
+        <Text style={styles.progressLabel}>
+          {t({ en: 'FINAL MILESTONE', ka: 'ფინალური ეტაპი' })}
+        </Text>
         <View style={styles.progressBar}>
           <View
             style={[
@@ -256,6 +279,7 @@ export default function MilestoneSwipeGame({ content, onComplete }: Props) {
             card={currentCard}
             onSwipe={handleSwipe}
             isActive={true}
+            getText={getText}
           />
         )}
       </View>
@@ -276,14 +300,18 @@ export default function MilestoneSwipeGame({ content, onComplete }: Props) {
             )}
           </View>
           <Text style={styles.feedbackTitle}>
-            {lastAnswer.correct ? 'Correct!' : 'Incorrect'}
+            {lastAnswer.correct
+              ? t({ en: 'Correct!', ka: 'სწორია!' })
+              : t({ en: 'Incorrect', ka: 'არასწორია' })}
           </Text>
-          <Text style={styles.feedbackText}>{lastAnswer.feedback}</Text>
+          <Text style={styles.feedbackText}>
+            {getText(lastAnswer.feedback)}
+          </Text>
           <TouchableOpacity style={styles.continueBtn} onPress={handleContinue}>
             <Text style={styles.continueBtnText}>
               {currentIndex < content.cards.length - 1
-                ? 'Next Question'
-                : 'See Results'}
+                ? t({ en: 'Next Question', ka: 'შემდეგი კითხვა' })
+                : t({ en: 'See Results', ka: 'შედეგების ნახვა' })}
             </Text>
           </TouchableOpacity>
         </View>
@@ -292,11 +320,15 @@ export default function MilestoneSwipeGame({ content, onComplete }: Props) {
       <View style={styles.footer}>
         <View style={styles.legendItem}>
           <X size={20} color={Colors.error} />
-          <Text style={styles.legendText}>False / Unsafe</Text>
+          <Text style={styles.legendText}>
+            {t({ en: 'False / Unsafe', ka: 'მცდარი / სახიფათო' })}
+          </Text>
         </View>
         <View style={styles.legendItem}>
           <Check size={20} color={Colors.success} />
-          <Text style={styles.legendText}>True / Safe</Text>
+          <Text style={styles.legendText}>
+            {t({ en: 'True / Safe', ka: 'ჭეშმარიტი / უსაფრთხო' })}
+          </Text>
         </View>
       </View>
     </View>

@@ -1,10 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+} from 'react-native';
+import {
+  Colors,
+  Spacing,
+  BorderRadius,
+  Typography,
+  Shadow,
+} from '@/constants/theme';
+import { useLanguage } from '@/contexts/LanguageContext'; // 1. Import Hook
+
+// 2. Define Types
+type BilingualText = string | { en: string; ka: string };
 
 type Props = {
   content: {
-    instructions: string;
+    instructions: BilingualText;
     tempo: number;
     duration: number;
   };
@@ -12,10 +28,18 @@ type Props = {
 };
 
 export default function RhythmGame({ content, onComplete }: Props) {
+  const { t } = useLanguage(); // 3. Get translation function
+
   const [taps, setTaps] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeLeft, setTimeLeft] = useState(content.duration);
   const [scaleValue] = useState(new Animated.Value(1));
+
+  // Helper to safely extract text
+  const getText = (text: BilingualText | undefined) => {
+    if (!text) return '';
+    return typeof text === 'object' ? t(text) : text;
+  };
 
   const beatInterval = (60 / content.tempo) * 1000;
 
@@ -33,7 +57,7 @@ export default function RhythmGame({ content, onComplete }: Props) {
             duration: beatInterval / 2,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       );
       pulseAnimation.start();
 
@@ -58,13 +82,15 @@ export default function RhythmGame({ content, onComplete }: Props) {
   const handleComplete = () => {
     setIsPlaying(false);
     const expectedTaps = Math.floor(content.duration / (beatInterval / 1000));
+    // Simple logic: catch at least 50% of beats for full score, capped at 100
     const accuracy = Math.min(100, Math.round((taps / expectedTaps) * 100));
+    // You can adjust scoring logic as needed
     const score = Math.max(0, Math.min(100, accuracy));
     onComplete(score);
   };
 
   const handleTap = () => {
-    setTaps(prev => prev + 1);
+    setTaps((prev) => prev + 1);
   };
 
   const handleStart = () => {
@@ -77,12 +103,20 @@ export default function RhythmGame({ content, onComplete }: Props) {
     return (
       <View style={styles.container}>
         <View style={styles.startContainer}>
-          <Text style={styles.instructions}>{content.instructions}</Text>
+          {/* Use getText for dynamic instructions */}
+          <Text style={styles.instructions}>
+            {getText(content.instructions)}
+          </Text>
           <Text style={styles.subInstructions}>
-            Tap the circle to the beat for {content.duration} seconds
+            {t({
+              en: `Tap the circle to the beat for ${content.duration} seconds`,
+              ka: `დააკაკუნე რიტმზე ${content.duration} წამის განმავლობაში`,
+            })}
           </Text>
           <TouchableOpacity style={styles.startButton} onPress={handleStart}>
-            <Text style={styles.startButtonText}>Start</Text>
+            <Text style={styles.startButtonText}>
+              {t({ en: 'Start', ka: 'დაწყება' })}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -92,8 +126,12 @@ export default function RhythmGame({ content, onComplete }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.timer}>Time: {timeLeft}s</Text>
-        <Text style={styles.tapsCount}>Taps: {taps}</Text>
+        <Text style={styles.timer}>
+          {t({ en: 'Time', ka: 'დრო' })}: {timeLeft}s
+        </Text>
+        <Text style={styles.tapsCount}>
+          {t({ en: 'Taps', ka: 'დარტყმა' })}: {taps}
+        </Text>
       </View>
 
       <View style={styles.gameArea}>
@@ -102,8 +140,12 @@ export default function RhythmGame({ content, onComplete }: Props) {
           onPress={handleTap}
           disabled={!isPlaying}
         >
-          <Animated.View style={[styles.tapCircle, { transform: [{ scale: scaleValue }] }]}>
-            <Text style={styles.tapText}>TAP</Text>
+          <Animated.View
+            style={[styles.tapCircle, { transform: [{ scale: scaleValue }] }]}
+          >
+            <Text style={styles.tapText}>
+              {t({ en: 'TAP', ka: 'დააჭირე' })}
+            </Text>
           </Animated.View>
         </TouchableOpacity>
 
@@ -111,7 +153,12 @@ export default function RhythmGame({ content, onComplete }: Props) {
           <View style={styles.babyBack}>
             <Text style={styles.babyText}>👶</Text>
           </View>
-          <Text style={styles.babyLabel}>Gentle pats on baby's back</Text>
+          <Text style={styles.babyLabel}>
+            {t({
+              en: "Gentle pats on baby's back",
+              ka: 'ნაზი დარტყმები ბავშვის ზურგზე',
+            })}
+          </Text>
         </View>
       </View>
     </View>
