@@ -215,7 +215,6 @@ export default function LoginScreen() {
                 <Text style={styles.socialButtonText}>Google</Text>
               </TouchableOpacity>
 
-             
             </View>
 
             <TouchableOpacity
