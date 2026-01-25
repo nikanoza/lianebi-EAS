@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -165,6 +166,14 @@ export default function HomeHub() {
 
   const handleUnitPress = (unit: Unit) => {
     if (!unit.is_active) return;
+
+    if (Platform.OS === 'web') {
+      const appSessionId = (window as any).__appSessionId;
+      if (appSessionId) {
+        sessionStorage.setItem('unitLessonSession', appSessionId);
+      }
+    }
+
     router.push(`/unit/${unit.id}`);
   };
 

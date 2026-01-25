@@ -7,11 +7,11 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-// 1. IMPORT THE LANGUAGE HOOK
 import { useLanguage } from '@/contexts/LanguageContext';
 import LioMascot from '@/components/LioMascot';
 import { ArrowLeft, Check, Lock } from 'lucide-react-native';
@@ -151,7 +151,13 @@ export default function UnitMapScreen() {
     );
     if (state === 'locked') return;
 
-    // Make sure we pass the ID to the player
+    if (Platform.OS === 'web') {
+      const appSessionId = (window as any).__appSessionId;
+      if (appSessionId) {
+        sessionStorage.setItem('unitLessonSession', appSessionId);
+      }
+    }
+
     router.push(`/lesson/${lesson.id}`);
   };
 
