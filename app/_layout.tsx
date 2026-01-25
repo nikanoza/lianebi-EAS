@@ -30,15 +30,7 @@ function InitialLayout() {
 
   useEffect(() => {
     if (loading) return;
-
-    const inAuthGroup = segments[0] === 'auth';
-    const inTabsGroup = segments[0] === '(tabs)';
-
-    if (!session && !inAuthGroup) {
       router.replace('/');
-    } else if (session && inAuthGroup) {
-      router.replace('/(tabs)');
-    }
   }, [session, loading, segments]);
 
   if (loading) {
