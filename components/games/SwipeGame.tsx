@@ -25,25 +25,21 @@ import {
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import LioMascot from '@/components/LioMascot';
 import { hungerCueIcons } from '@/components/HungerCueIcons';
-// 1. IMPORT THE LANGUAGE HOOK
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.lg * 2;
+const CARD_HEIGHT = 420; // Fixed height for both cards
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
 
-// 2. UPDATE TYPES TO SUPPORT BILINGUAL TEXT
 type BilingualText = string | { en: string; ka: string };
 
 type Card = {
   type?: 'intro' | 'swipe' | 'reward';
-  image?: string;
   icon?: keyof typeof hungerCueIcons;
-  text: BilingualText; // Changed from string to BilingualText
+  text: BilingualText;
   answer?: string;
-  feedback?: BilingualText; // Changed from string to BilingualText
-  illustration?: string;
-  lioMessage?: string;
+  feedback?: BilingualText;
   reward?: string;
 };
 
@@ -56,6 +52,7 @@ type Props = {
   onComplete: (score: number) => void;
 };
 
+// Fixed Types including index
 type SwipeableCardProps = {
   card: Card;
   index: number;
@@ -64,11 +61,8 @@ type SwipeableCardProps = {
   isActive: boolean;
 };
 
-// 3. UPDATE SWIPEABLE CARD COMPONENT
 function SwipeableCard({ card, onSwipe, isActive }: SwipeableCardProps) {
-  // Use the hook inside the component
   const { t } = useLanguage();
-  console.log(card);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -131,7 +125,6 @@ function SwipeableCard({ card, onSwipe, isActive }: SwipeableCardProps) {
     ),
   }));
 
-  // Helper to safely render text
   const getText = (text: BilingualText | undefined) => {
     if (!text) return '';
     return typeof text === 'object' ? t(text) : text;
@@ -157,16 +150,16 @@ function SwipeableCard({ card, onSwipe, isActive }: SwipeableCardProps) {
           </Animated.View>
 
           <View style={styles.cardContent}>
-            {card.icon ? (
-              <View style={styles.illustrationContainer}>
-                {React.createElement(hungerCueIcons[card.icon], { size: 140 })}
-                {card.text && (
-                  <Text style={styles.illustrationText}>
-                    {getText(card.text)}
-                  </Text>
-                )}
-              </View>
-            ) : null}
+            <View style={styles.illustrationContainer}>
+              {card.icon &&
+                hungerCueIcons[card.icon] &&
+                React.createElement(hungerCueIcons[card.icon], { size: 140 })}
+              {card.text && (
+                <Text style={styles.illustrationText}>
+                  {getText(card.text)}
+                </Text>
+              )}
+            </View>
           </View>
         </View>
       </Animated.View>
@@ -176,7 +169,6 @@ function SwipeableCard({ card, onSwipe, isActive }: SwipeableCardProps) {
 
 export default function SwipeGame({ content, onComplete }: Props) {
   const { t } = useLanguage();
-
   const [phase, setPhase] = useState<'intro' | 'game' | 'reward'>(
     content.intro ? 'intro' : 'game',
   );
@@ -190,14 +182,9 @@ export default function SwipeGame({ content, onComplete }: Props) {
 
   const currentCard = content.cards[currentIndex];
 
-  // Helper inside the main component as well
   const getText = (text: BilingualText | undefined) => {
     if (!text) return '';
     return typeof text === 'object' ? t(text) : text;
-  };
-
-  const handleIntroNext = () => {
-    setPhase('game');
   };
 
   const handleSwipe = (direction: 'left' | 'right') => {
@@ -213,9 +200,9 @@ export default function SwipeGame({ content, onComplete }: Props) {
   };
 
   const handleContinue = () => {
-    setShowFeedback(false);
-    setLastAnswer(null);
     if (currentIndex < content.cards.length - 1) {
+      setShowFeedback(false);
+      setLastAnswer(null);
       setCurrentIndex((prev) => prev + 1);
     } else {
       if (content.reward) {
@@ -242,7 +229,7 @@ export default function SwipeGame({ content, onComplete }: Props) {
           <Text style={styles.introText}>{getText(content.intro.text)}</Text>
           <TouchableOpacity
             style={styles.startButton}
-            onPress={handleIntroNext}
+            onPress={() => setPhase('game')}
           >
             <Text style={styles.startButtonText}>
               {t({ en: 'Start Learning', ka: 'სწავლის დაწყება' })}
@@ -284,48 +271,53 @@ export default function SwipeGame({ content, onComplete }: Props) {
       </View>
 
       <View style={styles.cardContainer}>
-        {!showFeedback && (
-          <SwipeableCard
-            card={currentCard}
-            index={currentIndex}
-            totalCards={content.cards.length}
-            onSwipe={handleSwipe}
-            isActive={true}
-          />
-        )}
-      </View>
-
-      {showFeedback && lastAnswer && (
-        <Animated.View
-          style={[
-            styles.feedbackOverlay,
-            lastAnswer.correct
-              ? styles.correctOverlay
-              : styles.incorrectOverlay,
-          ]}
-        >
-          <Text style={styles.feedbackTitle}>
-            {lastAnswer.correct
-              ? t({ en: 'Correct!', ka: 'სწორია!' })
-              : t({ en: 'Not quite!', ka: 'არასწორია!' })}
-          </Text>
-          {lastAnswer.feedback && (
-            <Text style={styles.feedbackText}>
-              {getText(lastAnswer.feedback)}
-            </Text>
+        {/* Game Area: A fixed box. 
+           Both the Card and the Feedback Overlay will fill this box exactly.
+        */}
+        <View style={styles.gameArea}>
+          {!showFeedback && (
+            <SwipeableCard
+              card={currentCard}
+              index={currentIndex}
+              totalCards={content.cards.length}
+              onSwipe={handleSwipe}
+              isActive={true}
+            />
           )}
-          <TouchableOpacity
-            style={styles.continueButton}
-            onPress={handleContinue}
-          >
-            <Text style={styles.continueButtonText}>
-              {currentIndex < content.cards.length - 1
-                ? t({ en: 'Next Card', ka: 'შემდეგი' })
-                : t({ en: 'Finish', ka: 'დასრულება' })}
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+
+          {showFeedback && lastAnswer && (
+            <Animated.View
+              style={[
+                styles.feedbackOverlay, // Fills gameArea
+                lastAnswer.correct
+                  ? styles.correctOverlay
+                  : styles.incorrectOverlay,
+              ]}
+            >
+              <Text style={styles.feedbackTitle}>
+                {lastAnswer.correct
+                  ? t({ en: 'Correct!', ka: 'სწორია!' })
+                  : t({ en: 'Not quite!', ka: 'არასწორია!' })}
+              </Text>
+              {lastAnswer.feedback && (
+                <Text style={styles.feedbackText}>
+                  {getText(lastAnswer.feedback)}
+                </Text>
+              )}
+              <TouchableOpacity
+                style={styles.continueButton}
+                onPress={handleContinue}
+              >
+                <Text style={styles.continueButtonText}>
+                  {currentIndex < content.cards.length - 1
+                    ? t({ en: 'Next Card', ka: 'შემდეგი' })
+                    : t({ en: 'Finish', ka: 'დასრულება' })}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+        </View>
+      </View>
 
       <View style={styles.instructions}>
         <View style={styles.instructionRow}>
@@ -407,13 +399,27 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.semibold,
     color: Colors.primary,
   },
+
+  // --- LAYOUT STYLES ---
   cardContainer: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: Spacing.xl,
+    justifyContent: 'center',
   },
-  cardWrapper: { width: CARD_WIDTH, height: 420 },
+  // This wrapper defines the size for BOTH the question and the result.
+  gameArea: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  // The animated view inside SwipeableCard fills the gameArea
+  cardWrapper: {
+    width: '100%',
+    height: '100%',
+  },
+  // The actual white card
   card: {
     flex: 1,
     backgroundColor: Colors.white,
@@ -421,6 +427,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...Shadow.large,
   },
+  // --- END LAYOUT STYLES ---
+
   swipeOverlay: {
     position: 'absolute',
     top: 0,
@@ -441,7 +449,7 @@ const styles = StyleSheet.create({
   },
   illustrationContainer: {
     width: '100%',
-    height: 280,
+    height: '100%',
     backgroundColor: Colors.background,
     borderRadius: BorderRadius.lg,
     alignItems: 'center',
@@ -457,43 +465,46 @@ const styles = StyleSheet.create({
     lineHeight: Typography.sizes.lg * 1.4,
     paddingHorizontal: Spacing.lg,
   },
+
+  // --- FEEDBACK STYLES ---
   feedbackOverlay: {
-    position: 'absolute',
-    bottom: 280,
-    left: Spacing.lg,
-    right: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
+    width: '100%', // Fill gameArea
+    height: '100%', // Fill gameArea
     borderRadius: BorderRadius.xl,
     alignItems: 'center',
+    justifyContent: 'center', // Center content vertically
+    paddingHorizontal: Spacing.xl,
     ...Shadow.large,
+    // Removed absolute positioning so it sits inside gameArea naturally
   },
   correctOverlay: { backgroundColor: Colors.success },
   incorrectOverlay: { backgroundColor: Colors.error },
+
   feedbackTitle: {
-    fontSize: Typography.sizes.lg,
+    fontSize: Typography.sizes.xxl,
     fontWeight: Typography.weights.bold,
     color: Colors.white,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.md,
   },
   feedbackText: {
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.lg,
     color: Colors.white,
     textAlign: 'center',
-    lineHeight: Typography.sizes.sm * 1.4,
+    marginBottom: Spacing.xl,
+    lineHeight: Typography.sizes.lg * 1.4,
   },
   continueButton: {
     backgroundColor: Colors.white,
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: Spacing.xxl,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.full,
-    marginTop: Spacing.md,
   },
   continueButtonText: {
-    fontSize: Typography.sizes.base,
+    fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
     color: Colors.primary,
   },
+
   instructions: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xl,
