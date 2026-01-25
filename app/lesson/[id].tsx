@@ -92,6 +92,7 @@ export default function LessonScreen() {
 
     setScore(finalScore);
     setShowResults(true);
+    console.log('Game complete1');
     try {
       // (Progress saving logic remains the same)
       const { data: existingProgress, error: fetchError } = await supabase
@@ -102,7 +103,7 @@ export default function LessonScreen() {
         .maybeSingle();
 
       if (fetchError) throw fetchError;
-
+      console.log('Game complete2');
       if (existingProgress) {
         await supabase
           .from('user_progress')
@@ -112,6 +113,7 @@ export default function LessonScreen() {
             completed_at: new Date().toISOString(),
           })
           .eq('id', existingProgress.id);
+        console.log('Game complete3');
       } else {
         await supabase.from('user_progress').insert({
           user_id: profile.id,

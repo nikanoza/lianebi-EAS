@@ -13,9 +13,8 @@ import {
   Typography,
   Shadow,
 } from '@/constants/theme';
-import { useLanguage } from '@/contexts/LanguageContext'; // 1. Import Hook
+import { useLanguage } from '@/contexts/LanguageContext';
 
-// 2. Define Types
 type BilingualText = string | { en: string; ka: string };
 
 type Props = {
@@ -28,14 +27,13 @@ type Props = {
 };
 
 export default function RhythmGame({ content, onComplete }: Props) {
-  const { t } = useLanguage(); // 3. Get translation function
+  const { t } = useLanguage();
 
   const [taps, setTaps] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeLeft, setTimeLeft] = useState(content.duration);
   const [scaleValue] = useState(new Animated.Value(1));
 
-  // Helper to safely extract text
   const getText = (text: BilingualText | undefined) => {
     if (!text) return '';
     return typeof text === 'object' ? t(text) : text;
@@ -82,9 +80,7 @@ export default function RhythmGame({ content, onComplete }: Props) {
   const handleComplete = () => {
     setIsPlaying(false);
     const expectedTaps = Math.floor(content.duration / (beatInterval / 1000));
-    // Simple logic: catch at least 50% of beats for full score, capped at 100
     const accuracy = Math.min(100, Math.round((taps / expectedTaps) * 100));
-    // You can adjust scoring logic as needed
     const score = Math.max(0, Math.min(100, accuracy));
     onComplete(score);
   };
@@ -103,16 +99,22 @@ export default function RhythmGame({ content, onComplete }: Props) {
     return (
       <View style={styles.container}>
         <View style={styles.startContainer}>
-          {/* Use getText for dynamic instructions */}
+          {/* NEW TITLE ADDED HERE */}
+          <Text style={styles.instructions}>
+            {t({ en: "Let's do it together", ka: 'მოდი ერთად გავაკეთოთ' })}
+          </Text>
+
           <Text style={styles.instructions}>
             {getText(content.instructions)}
           </Text>
+
           <Text style={styles.subInstructions}>
             {t({
               en: `Tap the circle to the beat for ${content.duration} seconds`,
               ka: `დააკაკუნე რიტმზე ${content.duration} წამის განმავლობაში`,
             })}
           </Text>
+
           <TouchableOpacity style={styles.startButton} onPress={handleStart}>
             <Text style={styles.startButtonText}>
               {t({ en: 'Start', ka: 'დაწყება' })}
