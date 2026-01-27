@@ -9,6 +9,7 @@ import { LanguageProvider } from '@/contexts/LanguageContext';
 import GlobalLanguageSwitcher from '@/components/LanguageSwitcher';
 import WebContainer from '@/components/WebContainer';
 import { Colors } from '@/constants/theme';
+import AnalyticsTracker from '@/components/AnalyticsTracker';
 
 const appSessionId = Math.random().toString(36).substring(7);
 
@@ -41,7 +42,11 @@ function InitialLayout() {
     const isUnitOrLessonPage =
       segments[0] === 'unit' || segments[0] === 'lesson';
 
-    if (isUnitOrLessonPage && Platform.OS === 'web' && !hasCheckedInitialRoute.current) {
+    if (
+      isUnitOrLessonPage &&
+      Platform.OS === 'web' &&
+      !hasCheckedInitialRoute.current
+    ) {
       hasCheckedInitialRoute.current = true;
       const allowedSession = sessionStorage.getItem('unitLessonSession');
 
@@ -71,6 +76,7 @@ function InitialLayout() {
   return (
     <WebContainer>
       <GlobalLanguageSwitcher />
+      <AnalyticsTracker />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
